@@ -4,13 +4,13 @@ import numpy as np
 
 
 # Q-learning agent
-
-class MountainCarTileCoder:
-    def __init__(self, iht_size=4096, num_tilings=8, num_tiles=8):
+class TileCoder:
+    def __init__(self, low, high, num_tilings, num_tiles):
         """
         Initializes the MountainCar Tile Coder
         Initializers:
-        iht_size -- int, the size of the index hash table, typically a power of 2
+        high -- (n) upper value of state
+        low -- (n) lower value of state
         num_tilings -- int, the number of tilings
         num_tiles -- int, the number of tiles. Here both the width and height of the
                      tile coder are the same
@@ -19,16 +19,14 @@ class MountainCarTileCoder:
         self.num_tilings -- int, the number of tilings the tile coder will use
         self.num_tiles -- int, the number of tiles the tile coder will use
         """
-        self.state_upper = np.array([0.5, 0.07])
-        self.state_lower = np.array([-1.2, -0.07])
+        self.iht_size =  4 * num_tilings * (num_tiles ** len(high))
+        self.state_upper = np.array(high)
+        self.state_lower = np.array(low)
 
-        self.act_upper = np.array(1)
-        self.act_lower = np.array(-1)
-
-        self.iht_size = iht_size
-        self.iht = tc.IHT(iht_size)
-        self.num_tilings = num_tilings
-        self.num_tiles = num_tiles
+        self.iht = tc.IHT(self.iht_size)
+        
+        self.n_tilings = num_tilings
+        self.n_tiles = num_tiles
 
     def tile_state(self, state):
         """
@@ -41,34 +39,115 @@ class MountainCarTileCoder:
         returns:
         tiles - np.array, active tiles
         """
-        state_normalized = self.num_tiles  * np.divide(state - self.state_lower, self.state_upper - self.state_lower)
-        tiles = tc.tiles(self.iht, self.num_tilings, list(state_normalized))
+        state_normalized = self.n_tiles  * np.divide(state - self.state_lower, self.state_upper - self.state_lower)
+        tiles = tc.tiles(self.iht, self.n_tilings, list(state_normalized))
         return np.array(tiles)    
 
-    def state_feature_shape(self):
+    def feature_shape(self):
         return [self.iht_size]
     
-    def sa_feature_shape(self):
-        return [3, self.iht_size]
-    
-    def enumerate_actions(self):
-        return [0, 1, 2]
+    def num_tilings(self):
+        return self.n_tilings
 
-    def idx_from_action(self, action):
+
+
+
+class MTCCActionCoder:
+    
+    def num_actions(self):
+        return 3
+
+    def feature_shape(self):
+        return [3]
+    
+    def idx_from_act(self, action):
         if action[0] < -0.333:
-            return 0 
+            return 0
         if action[0] > 0.333:
             return 2
         return 1
-    
-    def action_from_idx(self,act_idx):
-        return [act_idx - 1]
 
+    def idx_to_act(self, idx):
+        if idx == 0:
+            return [-1]
+        if idx == 1:
+            return [0]
+        return [1]
+    
+    def enumerate_actions(self):
+        return [0,1,2]
+
+
+
+class PendulumActionCoder:
+    def __init__(self, num_bins=5, action_low=-2.0, action_high=2.0):
+        """
+        Discretizes Pendulum actions into `num_bins` evenly spaced torques.
+
+        Args:
+            num_bins (int): number of discrete actions
+            action_low (float): min torque
+            action_high (float): max torque
+        """
+        self.num_bins = num_bins
+        self.action_low = action_low
+        self.action_high = action_high
+
+        # Create evenly spaced discrete actions
+        self.actions = np.linspace(action_low, action_high, num_bins)
+
+    def num_actions(self):
+        return self.num_bins
+
+    def feature_shape(self):
+        return [self.num_bins]
+
+    def idx_from_act(self, action):
+        """
+        Map a continuous action to discrete index.
+        """
+        action = np.clip(action, self.action_low, self.action_high)
+        idx = np.argmin(np.abs(self.actions - action))
+        return idx
+
+    def idx_to_act(self, idx):
+        """
+        Map discrete index back to continuous action.
+        """
+        return [self.actions[idx]]
+
+    def enumerate_actions(self):
+        """
+        Return all discrete action indices.
+        """
+        return list(range(self.num_bins))
+
+
+class DiscreteActionCoder:
+    def __init__(self, num_bins=2):
+        self.num_bins = num_bins
+        pass
+
+    def idx_from_act(self, action):
+        return action
+    
+    def idx_to_act(self, idx):
+        return idx
+    
+    def feature_shape(self):
+        return [self.num_bins]
+
+    def enumerate_actions(self):
+        return list(range(self.num_bins)) 
+
+
+
+    
 
 class RandomAgent:
 
-    def __init__(self, actions):
-        self.actions = actions
+    def __init__(self, atc):
+        self.atc = atc
 
     def select_action(self, state):
         return np.ranodm.choice(self.actions)
@@ -78,78 +157,97 @@ class RandomAgent:
 
 class QLearningAgent:
 
-    def __init__(self,tilecoder, gamma, lr):
-        self.tilecoder =  tilecoder
-        self.Q_w = np.zeros(shape=tilecoder.sa_feature_shape()) 
+    def __init__(self, tilecoder, action_coder, gamma, lr):
+        self.stc =  tilecoder
+        self.atc = action_coder
+
+        self.Q_w = np.zeros(shape=action_coder.feature_shape() + tilecoder.feature_shape() ) 
+        print(self.Q_w.shape)
         self.gamma = gamma
-        self.lr = lr/self.tilecoder.num_tilings
+        self.lr = lr/(self.stc.num_tilings())
         print(self.lr)
+
+        # all possible actions
+        self.actions = self.atc.enumerate_actions()
+
         self.epsilon = 1.0
     
 
-    def select_action(self, state):
-        return self.tilecoder.action_from_idx(
-            np.argmax(
-                self.Q_values(self.tilecoder.tile_state(state))
-                ))
 
     def Q_values(self, state_features):
-        return np.sum((self.Q_w)[:,state_features], axis=1) 
+        return np.sum((self.Q_w)[:,state_features], axis=-1) 
 
     def select_action_epsilon_greedy(self, state_features, epsilon=0.0):
         if np.random.rand() < epsilon:
-            return self.tilecoder.action_from_idx(np.random.choice(self.tilecoder.enumerate_actions()))
+            return self.atc.idx_to_act(np.random.choice(self.actions))
         else:
-            return self.tilecoder.action_from_idx(np.argmax(self.Q_values(state_features)))
+            return self.atc.idx_to_act(np.argmax(self.Q_values(state_features)))
+
+    def select_action(self, state):
+        return self.atc.idx_to_act(
+            np.argmax(
+                self.Q_values(self.stc.tile_state(state))
+                ))
 
     def Q_update(self, last_state_features, action_features, reward, state_features, terminated):
         td_target = reward
         if not terminated:
             td_target += self.gamma * np.max(self.Q_values(state_features))
-        delta = td_target - self.Q_values(last_state_features)[action_features]
-        self.Q_w[action_features, last_state_features] += self.lr * delta 
-    
-    # def learn_policy_from_transitions(transitions):
-    #     for trajectory in transitions:
 
+        delta = td_target - self.Q_values(last_state_features)[action_features]
+        self.Q_w[action_features][last_state_features] += self.lr * delta
+
+
+
+        
 
     def learn_policy_internal(self, env, T, reward_fn):
         ep_reward = 0
         last_state, info = env.reset()
-        last_state_features = self.tilecoder.tile_state(last_state)
-        action = self.select_action_epsilon_greedy(last_state_features)
-        action_features = self.tilecoder.idx_from_action(action)
-        for j in range(T):
+        last_state_features = self.stc.tile_state(last_state)
+        action = self.select_action_epsilon_greedy(last_state_features, epsilon=self.epsilon)
+        action_features = self.atc.idx_from_act(action)
+        
+        for _ in range(T):
             # take a step
             state, reward, terminated, truncated, info = env.step(action)
-            if reward_fn != None:
-                reward = reward_fn(state, action)
-            ep_reward += reward
-            state_features = self.tilecoder.tile_state(state)
 
+            if reward_fn != None:
+                reward = reward_fn(last_state, action)
+
+            ep_reward += reward
+
+            state_features = self.stc.tile_state(state)
             # compute td target and update Q
             self.Q_update(
                 last_state_features,
                 action_features,
-                reward, state_features,
-                terminated)
+                reward,
+                state_features,
+                terminated
+            )
 
             last_state_features = state_features
             action = self.select_action_epsilon_greedy(state_features, self.epsilon)
-            action_features = self.tilecoder.idx_from_action(action)
+            action_features = self.atc.idx_from_act(action)
 
             if terminated or truncated:
                 return ep_reward, terminated
+            
         return ep_reward, False
 
-    def learn_policy(self,env, T, episodes,  reward_fn = None, verbose=True):
+    def learn_policy(self,env, T, episodes,  reward_fn = None, verbose=True, print_every=1000, epsilon_decay=0.9999, decay_every=25):
         # train q learning agent by interacting with the environment
+        self.epsilon = 1.0
 
         for i in range(episodes):
             ep_reward = self.learn_policy_internal(env, T, reward_fn)
 
             if i % 25 == 0:
-                self.epsilon *= 0.99
+                self.epsilon *= 0.999
+
+
+            if verbose and i % print_every == 0:
                 print(ep_reward, self.epsilon)
                 print(np.min(self.Q_w),np.max(self.Q_w))
 
@@ -176,6 +274,7 @@ class Trajectory:
 
     def dump(self):
         return np.array(self.last_state), np.array(self.action), np.array(self.reward), np.array(self.next_state)
+    
 
 def collect_rollouts(env, agent, T, num_rollouts, reward_fn = None):
 
@@ -203,19 +302,42 @@ def collect_rollouts(env, agent, T, num_rollouts, reward_fn = None):
     return rollouts
 
 
+def get_qlearning_agent(env_name, gamma, lr):
+    
+    if env_name == "MountainCarContinuous-v0":
+        mctc = TileCoder([-1.2, -0.07],[0.6, 0.07], num_tilings=8, num_tiles=8)
+        mcac = MTCCActionCoder()
+        return QLearningAgent(mctc,mcac, gamma,lr )
+
+    if env_name == "CartPole-v1":
+        cptc = TileCoder(low=[-2.5, -3.5, -0.3, -4.0], high=[2.5,3.5, 0.3, 4.0],num_tilings=32, num_tiles=16) 
+        cpac = DiscreteActionCoder(2)
+        return QLearningAgent(cptc, cpac, gamma=gamma, lr=lr)
+
+    if env_name == "Pendulum-v1":
+        pdtc = TileCoder(low=[-1.0, -1.0, -8.0], high=[1.0,1.0,8.0], num_tilings=32, num_tiles=16 )
+        pdac = PendulumActionCoder()
+
+        return QLearningAgent(pdtc, pdac, gamma=gamma, lr=lr)
+    
+
+
 
 import itertools
 import gymnasium as gym
-from tilecoding import MountainCarTileCoder
 if __name__ == "__main__":
+    # env_name = "MountainCarContinuous-v0"
+    # env = gym.make("MountainCarContinuous-v0", render_mode="rgb_array")
 
-    mctc = MountainCarTileCoder(iht_size=4096, num_tilings=16, num_tiles=16)
-    env = gym.make("MountainCarContinuous-v0", render_mode="rgb_array")
-    # env = gym.wrappers.RecordVideo(env, video_folder="videos", episode_trigger=lambda e: True)
+    env_name = "CartPole-v1"
+    env = gym.make(env_name, render_mode="rgb_array") 
 
-    agent = QLearningAgent(mctc, gamma=0.99,lr=0.1)
-    agent.learn_policy(env, 1000, 1000)
+    agent = get_qlearning_agent(env_name, 0.999, 0.1)
+    agent.learn_policy(env, 200, 10000)
+
+
     
-
-    rollouts = collect_rollouts(env, agent, 1000, 100)
+    
+    env = gym.wrappers.RecordVideo(env, video_folder="videos", episode_trigger=lambda e: True)
+    rollouts = collect_rollouts(env, agent, 1000, 10)
  

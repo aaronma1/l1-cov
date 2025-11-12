@@ -1,5 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
+from policies import p_s_from_rollouts, p_sa_from_rollouts, sr_from_rollouts
+from aggregation import get_aggregator
 
 
 def plot_heatmap(mat, xlabel="x coordinate", ylabel="Velocity [-0.7, 0.7]", title=None, show_ticks=True, save_path=None, cmap="turbo"):
@@ -63,7 +65,43 @@ def gen_visitation_plots(rollouts, save_dir):
     # plot unique states visisted
     pass
 
-def gen_l1_cov_plots(rollouts, save_dir):
+def gen_l1_cov_plots(rollouts, base_args, adversery_args, save_dir):
     # plot l1 coverability
+    l1_covs = []
+
+    for i in range(len(rollouts)):
+        epoch_rollouts = rollouts[i]
+        p_sa_from_rollouts(epoch_rollouts)
+        
+
+
     pass
+
+
+def gen_heatmap_epoch(rollouts, base_args, save_dir="out"):
+    s_agg, _ = get_aggregator(base_args["env_name"], bin_res=base_args["bin_res"])
+
+    for i, epoch in enumerate(rollouts):
+
+        P_S = p_s_from_rollouts(epoch, s_agg)
+        SR = sr_from_rollouts(epoch, s_agg)
+
+        plot_heatmap(P_S, save_path=f"{save_dir}/epoch{i}_mu_s")
+        plot_heatmap(SR, save_path=f"{save_dir}/epoch{i}_sr")
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 

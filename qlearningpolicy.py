@@ -269,7 +269,6 @@ def get_qlearning_agent(env_name, gamma, lr):
     if env_name == "Pendulum-v1":
         pdtc = TileCoder(low=[-1.0, -1.0, -8.0], high=[1.0,1.0,8.0], num_tilings=32, num_tiles=16 )
         pdac = PendulumActionCoder()
-
         return QLearningAgent(pdtc, pdac, gamma=gamma, lr=lr)
     
 

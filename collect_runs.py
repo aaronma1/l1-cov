@@ -1,7 +1,7 @@
-from policies import get_random_agent, sr_from_rollouts,p_s_from_rollouts, p_s_from_rollouts_1, collect_rollouts
+from policies import get_random_agent, sr_from_rollouts,p_s_from_rollouts, p_sa_from_rollouts, collect_rollouts
 from qlearningpolicy import get_qlearning_agent
 from aggregation import get_aggregator, S_Reward, SA_Reward, unflatten_state
-from plotting import plot_heatmap
+from plotting import gen_heatmap_epoch, plot_heatmap
 import gymnasium as gym
 import numpy as np
 
@@ -16,9 +16,14 @@ def setup_agent(base_args, agent_args):
 
 
 
-def l1_cov_from_transitions(base_args, agent_args, transitions):
-    pass
 
+def reward_shaping(reward_fn):
+    r_max = np.max(reward_fn)
+    r_min = np.min(reward_fn)
+    new_reward = reward_fn
+    new_reward -= r_min
+    new_reward /= (r_max - r_min)
+    return new_reward
 
 
 
@@ -28,7 +33,7 @@ The different collect_run functions should return a list of lists of trajectorie
 we allow more rollouts every epoch because we have more options to evaluate
 Also, we should keep track of how many environment interaction steps we have to do
 """    
-def collect_run_eigenoptions(base_args, option_args, out_file):
+def collect_run_eigenoptions(base_args, option_args):
 
 
     def eig(SR):
@@ -43,13 +48,7 @@ def collect_run_eigenoptions(base_args, option_args, out_file):
     s_agg, _ = get_aggregator(base_args["env_name"], bin_res=base_args["bin_res"])
     env = gym.make(base_args["env_name"], render_mode="rgb_array")
 
-    options = []
-    random_option = get_random_agent(base_args["env_name"])
-    options.append(random_option)
-
-    random_rollouts = collect_rollouts(env, random_option, base_args["env_T"], base_args["num_rollouts"])
-    SR = sr_from_rollouts(random_rollouts,s_agg, base_args["gamma"])
-
+    options = [get_random_agent(base_args["env_name"])]
     epoch_rollouts = []
     
     for i in range(base_args["num_epochs"]):
@@ -83,20 +82,44 @@ def collect_run_eigenoptions(base_args, option_args, out_file):
     return options, epoch_rollouts
 
         
-def collect_run_codex(base_args, option_args, adversery_args, out_file):
-    # policies = []
-    pass
+def collect_run_codex(base_args, option_args):
+    
+    s_agg, sa_agg = get_aggregator(base_args["env_name"], bin_res=1)
+    env = gym.make(base_args["env_name"], render_mode="rgb_array")
+
+    options = [get_random_agent(base_args["env_name"])]
+    epoch_rollouts = []
+    for i in range(base_args["num_epochs"]):
+        rollouts = []
+        for opt in options:
+            rollouts += collect_rollouts(env, opt, base_args["env_T"], base_args["num_rollouts"], epsilon=0.2)
+        epoch_rollouts.append(rollouts)
+
+        p_sa = p_sa_from_rollouts(rollouts, sa_agg)
+        uniform_density_sa = np.ones(sa_agg.shape())
+        l1_cov_reward = 1/(base_args["l1_eps"] * uniform_density_sa + p_sa) 
+        reward_fn = SA_Reward(sa_agg, reward_shaping(l1_cov_reward)- 1)
+        plot_heatmap(l1_cov_reward.reshape(12, 11*3), save_path=f"epoch{i}_cov_rew")
+        print(l1_cov_reward.shape)
+
+        option = setup_agent(base_args, option_args)
+        option.learn_policy(env, 200, 1000, reward_fn, epsilon_decay=0.99, decay_every=5)
+        options.append(option)
 
 
-    # for i in range():
+
+    return options, epoch_rollouts
+
+
+
+
+
 
 
 
 
 
 def collect_run_random(base_args, adversery_args, out_file):
-
-    # for i in range(epochs):
     pass
 
 
@@ -110,22 +133,22 @@ def dump_pickle(obj, save_name):
 if __name__ == "__main__":
     base_args = {
         "gamma":0.999, # global discount factor
-        "l1-eps":1e-4, # regularizer epsilon for 
+        "l1_eps":1e-4, # regularizer epsilon for 
         "bin_res": 1,
         "env_name": "MountainCarContinuous-v0",
         "env_T":200,
         "num_rollouts":100,
         "num_epochs": 15,
     }
-    base_args = {
-        "gamma":0.999, # global discount factor
-        "l1-eps":1e-4, # regularizer epsilon for 
-        "bin_res": 1,
-        "env_name": "CartPole-v1",
-        "env_T":200,
-        "num_rollouts":100,
-        "num_epochs": 15,
-    }
+    # base_args = {
+    #     "gamma":0.999, # global discount factor
+    #     "l1-eps":1e-4, # regularizer epsilon for 
+    #     "bin_res": 1,
+    #     "env_name": "CartPole-v1",
+    #     "env_T":200,
+    #     "num_rollouts":100,
+    #     "num_epochs": 15,
+    # }
 
     policy_grad_args = {
         "policy": "PolicyGrad", 
@@ -139,17 +162,15 @@ if __name__ == "__main__":
         "gamma":0.999,
         "lr":0.1,
     
-        # "num-tiles": 8,
-        # "num-tilings": 16, 
-        # "IHT_SIZE": 4096,
-
         "train_steps":400,
         "train_epochs":5000,
         "eps_start":1.0,
         "eps_decay":0.999,
     }
 
-    options, trajectories =  collect_run_eigenoptions(base_args, Qlearning_args, out_file="")
+    options, trajectories =  collect_run_codex(base_args, Qlearning_args)
+    
+    gen_heatmap_epoch(trajectories, base_args, save_dir="out")
     
 
     

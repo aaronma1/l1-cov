@@ -15,17 +15,20 @@ import copy
 
 import gc
 
+from policies import collect_rollouts
+from qlearningpolicy import MTCCActionCoder, PendulumActionCoder
+
 
 class ReinforcePolicy(nn.Module):
-    def __init__(self, env, gamma, lr, obs_dim, action_dim):
+    def __init__(self, gamma, lr, obs_dim, act_coder):
         super(ReinforcePolicy, self).__init__()
 
         self.device = "cpu"
-        hidden_dim=128
+        hidden_dim=64
 
         self.affine1 = nn.Linear(obs_dim, hidden_dim, device=self.device)
         self.middle = nn.Linear(hidden_dim, hidden_dim, device=self.device)
-        self.affine2 = nn.Linear(hidden_dim, action_dim, device=self.device)
+        self.affine2 = nn.Linear(hidden_dim, act_coder.num_actions(), device=self.device)
 
         torch.nn.init.xavier_uniform_(self.affine1.weight)
         torch.nn.init.xavier_uniform_(self.middle.weight)
@@ -37,10 +40,11 @@ class ReinforcePolicy(nn.Module):
         self.optimizer = optim.Adam(self.parameters(), lr=lr)
         self.eps = np.finfo(np.float32).eps.item()
 
-        self.env = env
         self.gamma = gamma
         self.obs_dim = obs_dim
-        self.action_dim = action_dim
+        self.action_dim = act_coder.num_actions()
+        self.atc = act_coder
+
 
     def init(self, init_policy):
         print("init to policy")
@@ -51,41 +55,33 @@ class ReinforcePolicy(nn.Module):
         x = F.relu(self.affine1(x))
         x = F.relu(self.middle(x))
         action_scores = self.affine2(x)
-        return F.softmax(action_scores, dim=1)
+        return F.softmax(action_scores/2, dim=1)
 
     def get_probs(self, state):
         state = torch.from_numpy(state).float().unsqueeze(0)
         probs = self.forward(state)
         return probs
 
-    def select_action_no_grad(self, state):
+    def select_action(self, state, epsilon=0.0):
         state = torch.from_numpy(state).float().unsqueeze(0)
         with torch.no_grad():
             probs = self.forward(state)
         m = Categorical(probs)
         action = m.sample()
+        return self.atc.idx_to_act(action)
 
-        if (action.item() == 1):
-            return [0]
-        elif (action.item() == 0):
-            return [-1]
-        return [1]
 
-    def select_action(self, state):
+    def _select_action(self, state):
 
         state = torch.from_numpy(state).float().unsqueeze(0)
         probs = self.forward(state)
         m = Categorical(probs)
         action = m.sample()
         self.saved_log_probs.append(m.log_prob(action))
+        return self.atc.idx_to_act(action)
 
-        if (action.item() == 1):
-            return [0]
-        elif (action.item() == 0):
-            return [-1]
-        return [1]
 
-    def update_policy(self):
+    def update_policy(self, running_reward):
         R = 0
         policy_loss = [] #
         rewards = []
@@ -113,25 +109,20 @@ class ReinforcePolicy(nn.Module):
     def learn_policy_internal(self, env, reward_fn, T=1000):
         ep_reward = 0
         last_state, info = env.reset()
-        print(last_state)
-
         for t in range(T):
-            action = self.select_action(last_state)
-            print(action)
-            state, reward, terminated, truncated, info = env.step(action[0])
+            action = self._select_action(last_state)
+            state, reward, terminated, truncated, info = env.step(action)
             if reward_fn != None:
                 reward = reward_fn(last_state, action)
             self.rewards.append(reward)
-            
             ep_reward += reward
-            self.rewards.append(reward)
 
             last_state = state
+
+            if terminated or truncated:
+                return ep_reward
         
         return ep_reward
-
-
-
 
 
 
@@ -140,14 +131,13 @@ class ReinforcePolicy(nn.Module):
         running_reward = 0
         running_loss = 0
         for i_episode in range(train_epochs):
-            ep_reward = 0
-            rewards, ep_reward = self.learn_policy_internal(env, reward_fn, T)
+            ep_reward = self.learn_policy_internal(env, reward_fn, T)
 
             running_reward = running_reward * (1-0.05) + ep_reward * 0.05
             if (i_episode == 0):
                 running_reward = ep_reward
             
-            loss = self.update_policy()
+            loss = self.update_policy(running_reward)
             running_loss = running_loss * (1-.005) + loss*0.05
 
             gc.collect()
@@ -156,38 +146,11 @@ class ReinforcePolicy(nn.Module):
                 print('Episode {}\tEpisode reward {:.2f}\tRunning reward: {:.2f}\tLoss: {:.2f}'.format(
                     i_episode, ep_reward, running_reward, running_loss))
 
-    #collects one rollout of current policy, returns reward and occupancy data. trajectory is of length T (or termination, whichever comes first)
-    def execute_internal(self, env, T, reward_fn, sa_reward, true_reward, init_state):
-        transitions = []
-
-        state = init_state
-        last_state = init_state 
-
-        for t in range(T):  
-            # select action
-            action = [self.select_action_no_grad(state)[0]]
-
-            # sa reward
-            state, reward, terminated, truncated, info = self.env.step(action)
-            if reward_fn != None:
-                reward = reward_fn(reward)
-            done = terminated or truncated
-                
-            transitions.append([copy.deepcopy(last_state), copy.deepcopy(action), copy.deepcopy(reward), copy.deepcopy(state)])
-            last_state = state
-            
-            if done:
-                exited = True
-                final_t = t + 1
-                break
-        env.close()
-
-        return transitions
     
 
 
 
-
+from policies import collect_rollouts
 
 
 if __name__ == "__main__":
@@ -195,11 +158,13 @@ if __name__ == "__main__":
     np.set_printoptions(suppress=True, edgeitems=100)
     np.set_printoptions(precision=3, suppress=True)
 
-    env_name = "CartPole-v1"
+    env_name = "Pendulum-v1"
     # Make environment.
     env = gym.make(env_name, render_mode="rgb_array")
-    # env.seed(int(time.time())) # seed environment
+    mtac = PendulumActionCoder(num_bins=7)
+    policy = ReinforcePolicy( 0.999, 0.01, 3, mtac)
+    policy.learn_policy(env, None, 3000, 200)
 
-    policy = ReinforcePolicy(env, 0.99, 1e-3, 4, 2)
+    env1 = gym.wrappers.RecordVideo(env, video_folder="videos", episode_trigger=lambda e: True)
 
-    policy.learn_policy(env, None, 1000, 1000)
+    collect_rollouts(env1, policy, 200, 10, None, 0)

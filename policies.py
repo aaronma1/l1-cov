@@ -116,7 +116,6 @@ def p_sa_from_rollouts(rollouts, sa_agg):
 
         s, a, _, _ = trajectory.dump()
         sa = sa_agg.sa_to_features(s, a)
-        print(tuple(sa.T))
         np.add.at(p, tuple(sa.T), 1)
         num_sa += s.shape[0]
 
@@ -156,7 +155,6 @@ def sr_from_rollouts(rollouts, s_agg, gamma=0.99, step_size = 0.01):
 
 import itertools
 import gymnasium as gym
-import plotting
 if __name__ == "__main__":
 
     # env_name = "CartPole-v1"
@@ -176,10 +174,6 @@ if __name__ == "__main__":
     p2 = s_agg.unflatten_state_table(p)
 
 
-    plotting.plot_heatmap(p, save_path="test.png")
-    plotting.plot_heatmap(p_sa[..., 0], save_path="test1.png")
-    plotting.plot_heatmap(p_sa[..., 1], save_path="test2.png")
-    plotting.plot_heatmap(p_sa[..., 2], save_path="test3.png")
 
 
 

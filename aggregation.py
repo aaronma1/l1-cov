@@ -29,7 +29,6 @@ class Aggregator:
         Vectorized: features shape = (N, dims) or (dims,)
         """
         return_array = len(features.shape) > 1
-
         features = np.atleast_2d(features)
         idx = np.ravel_multi_index(features.T, self.state_shape, order='F')
 
@@ -138,7 +137,12 @@ class SA_Aggregator_Disc:
         actions = np.atleast_1d(actions)
 
         state_features = self.agg_internal.s_to_features(states)
-        return np.concatenate([state_features, actions], axis=-1)
+
+        if return_int:
+            return np.concatenate([state_features, actions], axis=-1)[0]
+        else:
+            return np.concatenate([state_features, actions], axis=-1)[0]
+
         
 
 
@@ -149,20 +153,12 @@ class SA_Aggregator_Disc:
         actions = idxs // self.agg_internal.num_states()
 
         return np.concatenate([self.agg_internal.idx_to_features(states), actions], axis=-1)
-
-    def features_to_idx(self, features):
-        pass
-
-    def flatten_sa_table(self, sa_table):
-        pass
-        
-    def unflatten_sa_table(self, sa_table):
-        pass
     
-        """
-        transforms SA table for plotting.
-        state_table: (state_dims, act_dims) -> (state_dims[0] * prod(act_dims), state_dims[1:])
-        """
+    def shape(self):
+        return self.state_bins + [self.num_actions]
+    
+    def num_sa(self):
+        return np.prod(self.shape())
 
     
 
@@ -186,22 +182,16 @@ class SA_Aggregator:
     
 
     def idx_to_features(self, idxs):
-        feat = self.agg_internal.idx_to_features(idxs)
-        return feat[:, : len(self.state_space)], feat[:, len(self.state_space):]
+        return self.agg_internal.idx_to_features(idxs)
+
+    def features_to_idx(self, features):
+        return self.agg_internal.features_to_idx(features)
 
     def shape(self):
         return self.state_space+ self.act_space
-
-
-
-    def flatten_sa_table(self, sa_table):
-        pass
-        
-    def unflatten_sa_table(self, sa_table):
-        """
-        transforms SA table for plotting.
-        state_table: (state_dims, act_dims) -> (state_dims[0] * prod(act_dims), state_dims[1:])
-        """
+    
+    def num_sa(self):
+        return np.prod(self.shape())
 
 
 class S_Reward:
@@ -221,7 +211,13 @@ class SA_Reward:
         self.reward_table = reward_table
 
     def __call__(self, state, action):
-        return self.reward_table[tuple(self.agg.sa_to_features(state, action))]
+
+
+        rew = self.reward_table[tuple(self.agg.sa_to_features(state, action))]
+
+        # print(rew)
+
+        return rew
 
 
 
@@ -282,7 +278,6 @@ def flatten_state(state):
 
 
 
-import plotting
 
 if __name__ == "__main__":
 
@@ -312,18 +307,20 @@ if __name__ == "__main__":
     assert np.array_equal(agg.flatten_s_table(test_state_table1), test_state_table)
     assert np.array_equal(unflatten_state(test_state_table),agg.unflatten_s_table(test_state_table))
     assert np.array_equal(flatten_state(test_state_table1), agg.flatten_s_table(test_state_table1))
+    sa_agg = SA_Aggregator([-1, -1], [1, 1], [12,11], [-1], [1], [3])
+
+    test_states = np.random.uniform(-1, 1, (200, 2))
+    test_actions = np.random.uniform(-1, 1, size=(200, 1))
+    idx = sa_agg.sa_to_idx(test_states, test_actions)
+    features = sa_agg.sa_to_features(test_states, test_actions)    
+    print(features.shape, idx.shape)
+
+    assert np.array_equal(sa_agg.features_to_idx(features), idx)
+    assert np.array_equal(sa_agg.idx_to_features(idx), features)
 
 
 
-    agg = Aggregator([-1, -1], [1, 1], [3, 4])
-    test_states = np.array([
-    [-0.5, -0.5],
-    [0.5, 0.5]
-    ])
 
-    idxs = agg.s_to_idx(test_states)
-    features = agg.s_to_features(test_states)
 
-    print("features:", features)
-    print("idxs:", idxs)
-    print("unflattened idxs:", agg.idx_to_features(idxs))
+    
+

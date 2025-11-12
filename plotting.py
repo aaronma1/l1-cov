@@ -55,3 +55,15 @@ def plot_heatmap(mat, xlabel="x coordinate", ylabel="Velocity [-0.7, 0.7]", titl
     else:
         plt.show()
         return None
+
+
+
+
+def gen_visitation_plots(rollouts, save_dir):
+    # plot unique states visisted
+    pass
+
+def gen_l1_cov_plots(rollouts, save_dir):
+    # plot l1 coverability
+    pass
+

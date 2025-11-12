@@ -31,9 +31,7 @@ class Aggregator:
         return_array = len(features.shape) > 1
 
         features = np.atleast_2d(features)
-        print("features", features)
         idx = np.ravel_multi_index(features.T, self.state_shape, order='F')
-        print("idx", idx)
 
         if return_array:
             return idx
@@ -214,7 +212,7 @@ class S_Reward:
 
 
     def __call__(self, state, action):
-        return self.reward_table[self.agg.s_to_features(state)]
+        return self.reward_table[tuple(self.agg.s_to_features(state))]
         
 class SA_Reward:
 
@@ -223,7 +221,7 @@ class SA_Reward:
         self.reward_table = reward_table
 
     def __call__(self, state, action):
-        return self.reward_table[self.agg.sa_to_features(state, action)]
+        return self.reward_table[tuple(self.agg.sa_to_features(state, action))]
 
 
 
@@ -244,16 +242,43 @@ def get_aggregator(env_name, bin_res=1):
         a_bins = [3*bin_res]
         return Aggregator(s_low, s_high, s_bins), SA_Aggregator(s_low, s_high, s_bins, a_low, a_high, a_bins)
     
-    # if env_name == "CartPole-v0":
-    #     s_low = []
-    #     s_high =[]
-    #     s_bins = []
-    #     num_actions = 2
+    if env_name == "CartPole-v1":
+        s_low = [-2.5, -3.5, -0.3, -4.0]
+        s_high =[2.5, 3.5, 0.3, 4.0]
+        s_bins = [12, 12, 5, 12]
+        num_actions = 2
 
-    #     return Aggregator(s_low, s_high, s_bins), SA_Aggregator_Disc(s_low, s_high, s_bins, num_actions)
+        return Aggregator(s_low, s_high, s_bins), SA_Aggregator_Disc(s_low, s_high, s_bins, num_actions)
 
     
     
+
+
+def flatten_idx(x, v):
+    return x + 12*v 
+
+def unflatten_idx(i):
+    return (i%12, i//12)
+
+def unflatten_state(state):
+    a, b = (12, 11)
+
+    mat = np.zeros(shape=(a, b))
+
+    for i in range(a*b):
+        mat[unflatten_idx(i)] = state[i]
+
+    return mat
+
+def flatten_state(state):
+    a,b = (12,11)
+    mat = np.zeros(shape=(a*b))
+
+    for i in range(a*b):
+        mat[i] = state[unflatten_idx(i)]
+
+    return mat
+
 
 
 
@@ -262,22 +287,43 @@ import plotting
 if __name__ == "__main__":
 
 # quick self-consistency test
-    agg = Aggregator([-1, -1], [1, 1], [5, 6])
+    agg = Aggregator([-1, -1], [1, 1], [12, 11])
     test_states = np.random.uniform(-1, 1, (200, 2))
     idx = agg.s_to_idx(test_states)
-    features = agg.idx_to_features(idx)
+    features = agg.s_to_features(test_states)    
     assert np.array_equal(agg.features_to_idx(features), idx)
-    assert np.array_equal(agg.idx_to_features(idx),features)
+    assert np.array_equal(agg.idx_to_features(idx), features)
 
 
-    test_state_table = np.arange(30)
 
-    test_state_table1 = np.zeros((5,6))
-    for i in range(30):
-        test_state_table1[i%5, i//5] = i
+    test_state_table = np.arange(12*11)
+    test_state_table1 = np.zeros((12,11))
 
-        assert agg.features_to_idx(np.array([i%5, i//5])) == i
-        assert np.all(agg.idx_to_features(i) == np.array([i%5, i//5]))
+    for i in range(12*11):
+        test_state_table1[i%12, i//12] = i
+
+        assert np.all(np.array(unflatten_idx(i)) == agg.idx_to_features(i))
+        assert np.all(np.array(flatten_idx(i%12, i//12)) == agg.features_to_idx(np.array([i%12, i//12])))
+
+        assert agg.features_to_idx(np.array([i%12, i//12])) == i
+        assert np.all(agg.idx_to_features(i) == np.array([i%12, i//12]))
 
     print(agg.flatten_s_table(test_state_table1))
     assert np.array_equal(agg.flatten_s_table(test_state_table1), test_state_table)
+    assert np.array_equal(unflatten_state(test_state_table),agg.unflatten_s_table(test_state_table))
+    assert np.array_equal(flatten_state(test_state_table1), agg.flatten_s_table(test_state_table1))
+
+
+
+    agg = Aggregator([-1, -1], [1, 1], [3, 4])
+    test_states = np.array([
+    [-0.5, -0.5],
+    [0.5, 0.5]
+    ])
+
+    idxs = agg.s_to_idx(test_states)
+    features = agg.s_to_features(test_states)
+
+    print("features:", features)
+    print("idxs:", idxs)
+    print("unflattened idxs:", agg.idx_to_features(idxs))

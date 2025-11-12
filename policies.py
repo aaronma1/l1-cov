@@ -6,7 +6,7 @@ class RandomAgent:
         self.idx = np.arange(len(atc))
         self.atc = atc
 
-    def select_action(self, state):
+    def select_action(self, state, epsilon=0.0):
         return self.atc[np.random.choice(self.idx)]
 
 class Trajectory:
@@ -33,13 +33,13 @@ class Trajectory:
         return np.array(self.last_state), np.array(self.action), np.array(self.reward), np.array(self.next_state)
 
 
-def collect_rollouts(env, agent, T, num_rollouts, reward_fn = None):
+def collect_rollouts(env, agent, T, num_rollouts, reward_fn = None, epsilon=0.0):
 
-    def _collect_rollout(env, agent, T, reward_fn):
+    def _collect_rollout(env, agent, T, reward_fn, epsilon):
         trajectory = Trajectory()
         last_state, _ = env.reset()
         for i in range(T):
-            action = agent.select_action(last_state)
+            action = agent.select_action(last_state, epsilon)
             state, reward, terminated, truncated, info = env.step(action)
             if reward_fn != None:
                 reward = reward_fn(state, action)
@@ -54,7 +54,7 @@ def collect_rollouts(env, agent, T, num_rollouts, reward_fn = None):
           
     rollouts = []
     for i in range(num_rollouts):
-        rollouts.append(_collect_rollout(env, agent, T, reward_fn))
+        rollouts.append(_collect_rollout(env, agent, T, reward_fn, epsilon))
 
     return rollouts
 
@@ -80,7 +80,10 @@ def p_s_from_rollouts(rollouts, s_agg):
         s_prime_f = s_agg.s_to_features(s_prime)
 
         p[tuple(s_f[0])] += 1
-        np.add.at(p, tuple(s_prime_f.T), 1)
+
+        for i in range(s.shape[0]):
+            
+            p[s_prime_f[i][0], s_prime_f[i][1]] += 1
 
     p /= num_s
     return p
@@ -96,7 +99,9 @@ def p_s_from_rollouts_1(rollouts, s_agg):
         s = s_agg.s_to_idx(s)
         s_prime = s_agg.s_to_idx(s_prime)
         p[s[0]] += 1
-        p[list(s_prime)] += 1
+
+        for idx in s_prime:
+            p[idx] += 1
 
     p /= num_s
     return s_agg.unflatten_s_table(p)
@@ -129,12 +134,13 @@ def sr_from_rollouts(rollouts, s_agg, gamma=0.99, step_size = 0.01):
     for trajectory in rollouts:
 
         s, _, _, s_prime = trajectory.dump()
-        s = s_agg.s_to_idx(s)
-        s_prime = s_agg.s_to_idx(s_prime)
+        s_idx = s_agg.s_to_idx(s)
+        s_prime_idx = s_agg.s_to_idx(s_prime)
 
         for t in range(s.shape[0]):
-            delta = gamma*sr[s_prime[t], :] - sr[s[t], :] + (np.arange(n) == s[t]).astype(np.int32)
-            sr[s[t], :] += step_size * delta
+            delta = gamma*sr[s_prime_idx[t], :] - sr[s_idx[t], :]
+            delta[s_idx[t]] += 1
+            sr[s_idx[t], :] += step_size * delta
 
 
     return sr

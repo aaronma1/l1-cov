@@ -144,13 +144,6 @@ class DiscreteActionCoder:
 
     
 
-class RandomAgent:
-
-    def __init__(self, atc):
-        self.atc = atc
-
-    def select_action(self, state):
-        return np.ranodm.choice(self.actions)
 
 
 
@@ -251,55 +244,6 @@ class QLearningAgent:
                 print(ep_reward, self.epsilon)
                 print(np.min(self.Q_w),np.max(self.Q_w))
 
-
-class Trajectory:
-    def __init__(self):
-        self.last_state = []
-        self.reward = []
-        self.action = []
-        self.next_state = []
-        self.terminated = False
-    
-    def add_transition(self, state, action, reward, next_state, terminated = False):
-        if self.terminated:
-            return 
-
-        self.last_state.append(state)
-        self.action.append(action)
-        self.reward.append(reward)
-        self.next_state.append(next_state)
-
-        self.terminated = self.terminated | terminated
-    
-
-    def dump(self):
-        return np.array(self.last_state), np.array(self.action), np.array(self.reward), np.array(self.next_state)
-    
-
-def collect_rollouts(env, agent, T, num_rollouts, reward_fn = None):
-
-    def _collect_rollout(env, agent, T, reward_fn):
-        trajectory = Trajectory()
-        last_state, _ = env.reset()
-        for i in range(T):
-            action = agent.select_action(last_state)
-            state, reward, terminated, truncated, info = env.step(action)
-            if reward_fn != None:
-                reward = reward_fn(state, action)
-            
-            trajectory.add_transition(last_state, action, reward, state, terminated)
-            last_state = state
-
-            if terminated or truncated:
-                return trajectory
-
-        return trajectory
-          
-    rollouts = []
-    for i in range(num_rollouts):
-        rollouts.append(_collect_rollout(env, agent, T, reward_fn))
-
-    return rollouts
 
 
 def get_qlearning_agent(env_name, gamma, lr):

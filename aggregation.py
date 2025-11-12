@@ -1,3 +1,4 @@
+from ctypes.util import test
 import numpy as np
 
 class Aggregator:
@@ -30,7 +31,9 @@ class Aggregator:
         return_array = len(features.shape) > 1
 
         features = np.atleast_2d(features)
-        idx = np.ravel_multi_index(features.T, self.state_shape)
+        print("features", features)
+        idx = np.ravel_multi_index(features.T, self.state_shape, order='F')
+        print("idx", idx)
 
         if return_array:
             return idx
@@ -47,7 +50,7 @@ class Aggregator:
         Returns: shape (N, dims) if idx is array
         """
         idx = np.atleast_1d(idx)
-        features = np.array(np.unravel_index(idx, self.state_shape)).T
+        features = np.array(np.unravel_index(idx, self.state_shape, order='F')).T
         return features if features.shape[0] > 1 else features[0]
 
     # ---------------------------
@@ -85,19 +88,22 @@ class Aggregator:
         return np.prod(self.state_shape)
 
 
-    def flatten_state_table(self,state_table):
+    def flatten_s_table(self,state_table):
         """
         convert a table of shape self.shape() to a list of shape (self.total_states(), )
         """
-        return np.ravel(state_table)
+        return np.ravel(state_table, order='F')
 
 
 
-    def unflatten_state_table(self, state_table):
+    def unflatten_s_table(self, state_table):
         """
         convert a list of shape (self.total_states(), ) to a table of shape self.shape()
         """
-        return state_table.reshape(self.shape())
+        return state_table.reshape(self.shape(), order='F')
+            
+            
+
 
 
 # SA aggregator for discrete actions
@@ -231,10 +237,11 @@ def get_aggregator(env_name, bin_res=1):
     if env_name == "MountainCarContinuous-v0":
         s_low = [-1.2, -0.07]
         s_high = [0.6, 0.07]
-        s_bins = [12,11]
+        s_bins = [12*bin_res,11*bin_res]
+        # s_bins = [4, 4]
         a_low = [-1.0]
         a_high= [1.0]
-        a_bins = [3]
+        a_bins = [3*bin_res]
         return Aggregator(s_low, s_high, s_bins), SA_Aggregator(s_low, s_high, s_bins, a_low, a_high, a_bins)
     
     # if env_name == "CartPole-v0":
@@ -250,99 +257,27 @@ def get_aggregator(env_name, bin_res=1):
 
 
 
-
+import plotting
 
 if __name__ == "__main__":
 
-
-    sa = SA_Aggregator([-5, -5], [5, 5], [1], [-1], [1], [3])
-
-    print(sa.sa_to_idx(np.array([2,2]), np.array([1])))
-
-    
-
-    def spatial_tests():
-        # Example 2D aggregator
-        low = [0.0, 0.0]
-        high = [1.0, 1.0]
-        bins = [4, 5]  # 4 rows x 5 columns
-
-        agg = Aggregator(low, high, bins)
-
-        # Generate all discrete feature combinations in order
-        features_list = []
-        for i in range(bins[0]):      # first dim (row)
-            for j in range(bins[1]):  # second dim (col)
-                features_list.append([i, j])
-        features_list = np.array(features_list)
-
-        # Convert features to indices
-        indices = agg.features_to_idx(features_list)
-
-        # Print grid of indices
-        print("Features -> Indices mapping:")
-        for i in range(bins[0]):
-            row_indices = indices[i * bins[1]:(i+1) * bins[1]]
-            print(row_indices)
-
-        # Also check top-left and bottom-right
-        print("\nTop-left index:", indices[0])
-        print("Bottom-right index:", indices[-1])
-        print("Total indices:", agg.total_states())
+# quick self-consistency test
+    agg = Aggregator([-1, -1], [1, 1], [5, 6])
+    test_states = np.random.uniform(-1, 1, (200, 2))
+    idx = agg.s_to_idx(test_states)
+    features = agg.idx_to_features(idx)
+    assert np.array_equal(agg.features_to_idx(features), idx)
+    assert np.array_equal(agg.idx_to_features(idx),features)
 
 
-        #test reshaping
+    test_state_table = np.arange(30)
 
-        state_table = np.random.rand(*agg.shape())
-        assert np.all(agg.unflatten_state_table(agg.flatten_state_table(state_table)) == state_table) 
-        print("passed spatial tests")
+    test_state_table1 = np.zeros((5,6))
+    for i in range(30):
+        test_state_table1[i%5, i//5] = i
 
+        assert agg.features_to_idx(np.array([i%5, i//5])) == i
+        assert np.all(agg.idx_to_features(i) == np.array([i%5, i//5]))
 
-    def random_state_tests():
-        np.random.seed(42)  # for reproducibility
-
-        # Aggregator setup
-        low = [-1.0, -5.0, 0.0]
-        high = [1.0, 5.0, 10.0]
-        bins = [4, 5, 6]
-
-        agg = Aggregator(low, high, bins)
-
-        # Generate random states (including some out-of-bounds)
-        N = 10000
-        states = np.random.uniform(
-            low=[l for l in low],   # deliberately extend below min
-            high=[h for h in high], # deliberately extend above max
-            size=(N, len(low))
-        )
-
-        # ---- Step 1: State → features ----
-        features = agg.state_to_features(states)
-
-        # Check all features are within valid range
-        for d, b in enumerate(bins):
-            assert np.all(features[:, d] >= 0), f"Dimension {d}: feature < 0"
-            assert np.all(features[:, d] < b), f"Dimension {d}: feature >= bin count"
-
-        # ---- Step 2: Features → index ----
-        indices = agg.features_to_idx(features)
-
-        # Check indices are within range
-        total_states = agg.total_states()
-        assert np.all(indices >= 0) and np.all(indices < total_states), "Index out of range"
-
-        # ---- Step 3: Index → features (round-trip) ----
-        recovered_features = agg.idx_to_features(indices)
-        assert np.all(features == recovered_features), "Round-trip feature mismatch"
-
-        # ---- Step 4: State → index → features → index round-trip ----
-        recovered_indices = agg.features_to_idx(recovered_features)
-        assert np.all(indices == recovered_indices), "Round-trip index mismatch"
-
-        print(f"Randomized test passed for {N} states with {len(low)} dimensions!")
-
-    # Run the random test
-
-    random_state_tests()
-
-    spatial_tests()
+    print(agg.flatten_s_table(test_state_table1))
+    assert np.array_equal(agg.flatten_s_table(test_state_table1), test_state_table)

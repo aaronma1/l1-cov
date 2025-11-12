@@ -74,18 +74,32 @@ def p_s_from_rollouts(rollouts, s_agg):
     for trajectory in rollouts:
 
         s, _, _, s_prime = trajectory.dump()
-
-        s = s_agg.s_to_features(s)
-        s_prime = s_agg.s_to_features(s_prime)
-
-        p[s[0][0], s[0][1]] += 1
-        np.add.at(p, tuple(s_prime.T), 1)
         num_s += s.shape[0] + 1
+
+        s_f = s_agg.s_to_features(s)
+        s_prime_f = s_agg.s_to_features(s_prime)
+
+        p[tuple(s_f[0])] += 1
+        np.add.at(p, tuple(s_prime_f.T), 1)
 
     p /= num_s
     return p
          
 
+def p_s_from_rollouts_1(rollouts, s_agg):
+
+    p = np.zeros(s_agg.num_states())
+    num_s =0
+    for trajectory in rollouts:
+        s, _, _, s_prime = trajectory.dump()
+        num_s += s.shape[0] + 1
+        s = s_agg.s_to_idx(s)
+        s_prime = s_agg.s_to_idx(s_prime)
+        p[s[0]] += 1
+        p[list(s_prime)] += 1
+
+    p /= num_s
+    return s_agg.unflatten_s_table(p)
         
 
 
@@ -97,6 +111,7 @@ def p_sa_from_rollouts(rollouts, sa_agg):
 
         s, a, _, _ = trajectory.dump()
         sa = sa_agg.sa_to_features(s, a)
+        print(tuple(sa.T))
         np.add.at(p, tuple(sa.T), 1)
         num_sa += s.shape[0]
 
@@ -118,8 +133,7 @@ def sr_from_rollouts(rollouts, s_agg, gamma=0.99, step_size = 0.01):
         s_prime = s_agg.s_to_idx(s_prime)
 
         for t in range(s.shape[0]):
-            
-            delta = gamma*sr[s_prime[t], :] - sr[s[t], :] + (np.arange(n) == s[t]).astype(np.float32)
+            delta = gamma*sr[s_prime[t], :] - sr[s[t], :] + (np.arange(n) == s[t]).astype(np.int32)
             sr[s[t], :] += step_size * delta
 
 

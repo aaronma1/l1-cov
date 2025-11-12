@@ -1,4 +1,4 @@
-from policies import get_random_agent, sr_from_rollouts, p_s_from_rollouts, collect_rollouts
+from policies import get_random_agent, sr_from_rollouts,p_s_from_rollouts, p_s_from_rollouts_1, collect_rollouts
 from qlearningpolicy import get_qlearning_agent
 from aggregation import get_aggregator, S_Reward, SA_Reward
 from plotting import plot_heatmap
@@ -34,13 +34,13 @@ def collect_run_eigenoptions(base_args, option_args, out_file):
     def eig(SR):
         SR = (SR+ SR.T)/2.0
         
-        eigenvalues, eigenvectors = np.linalg.eigh(SR)
+        eigenvalues, eigenvectors = np.linalg.eig(SR)
         idx = np.argsort(-eigenvalues.real)
         eigenvalues = np.real_if_close(eigenvalues, tol=1e5)[idx]
         eigenvectors = np.real_if_close(eigenvectors, tol=1e5)[idx]
         return eigenvectors, eigenvalues
 
-    s_agg, _ = get_aggregator(base_args["env_name"], bin_res=1)
+    s_agg, _ = get_aggregator(base_args["env_name"], bin_res=base_args["bin_res"])
     env = gym.make(base_args["env_name"], render_mode="rgb_array")
 
     options = []
@@ -48,9 +48,17 @@ def collect_run_eigenoptions(base_args, option_args, out_file):
     random_option = get_random_agent(base_args["env_name"])
     random_rollouts = collect_rollouts(env, random_option, base_args["env_T"], base_args["num_rollouts"])
     SR = sr_from_rollouts(random_rollouts,s_agg, base_args["gamma"])
-    eigenvectors , _ = eig(SR)
-    print(eigenvectors.shape)
-    plot_heatmap(s_agg.unflatten_state_table(eigenvectors[:, 0]), save_path="eig0.png")
+    plot_heatmap(SR, save_path="sr.png")
+
+    eigenvectors , eigenvalues = eig(SR)
+    
+    top_eig = s_agg.unflatten_s_table(eigenvectors[:, 0])
+
+    plot_heatmap(p_s_from_rollouts_1(random_rollouts, s_agg), save_path="p_s1.png")
+    plot_heatmap(p_s_from_rollouts(random_rollouts, s_agg), save_path="p_s.png")
+    print(top_eig.shape)
+    plot_heatmap( top_eig, save_path="eig0.png")
+
 
 
 
@@ -95,10 +103,10 @@ if __name__ == "__main__":
     base_args = {
         "gamma":0.999, # global discount factor
         "l1-eps":1e-4, # regularizer epsilon for 
-        "bin_res": 1,
+        "bin_res": 2,
         "env_name": "MountainCarContinuous-v0",
         "env_T":200,
-        "num_rollouts":100,
+        "num_rollouts":1000,
         "num_epochs": 15,
     }
 

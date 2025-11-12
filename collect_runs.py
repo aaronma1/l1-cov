@@ -16,6 +16,10 @@ def setup_agent(base_args, agent_args):
 
 
 
+def l1_cov_from_transitions(base_args, agent_args, transitions):
+    pass
+
+
 
 
 """
@@ -24,10 +28,6 @@ The different collect_run functions should return a list of lists of trajectorie
 we allow more rollouts every epoch because we have more options to evaluate
 Also, we should keep track of how many environment interaction steps we have to do
 """    
-
-
-
-
 def collect_run_eigenoptions(base_args, option_args, out_file):
 
 

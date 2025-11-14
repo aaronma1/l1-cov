@@ -106,7 +106,7 @@ class Aggregator:
 # SA aggregator for discrete actions
 class SA_Aggregator_Disc:
     def __init__(self, state_low, state_high, state_bins, num_actions):
-        self.state_space = state_bins
+        self.state_bins = state_bins
         self.agg_internal = Aggregator(state_low, state_high, state_bins)
         self.num_actions = num_actions
 
@@ -118,7 +118,7 @@ class SA_Aggregator_Disc:
     
         outputs:
         """
-        return_int = type(actions) == int
+        return_int = np.isscalar(actions)
 
         states = np.atleast_2d(states)
         actions = np.atleast_1d(actions)
@@ -131,17 +131,17 @@ class SA_Aggregator_Disc:
 
     def sa_to_features(self, states, actions):
 
-        return_int = type(actions) == int
+        return_int = np.isscalar(actions)
 
-        states = np.atleast_2d(states)
-        actions = np.atleast_1d(actions)
-
-        state_features = self.agg_internal.s_to_features(states)
+        actions = np.atleast_2d(actions).T
+        state_features = np.atleast_2d(self.agg_internal.s_to_features(states))
+        ret = np.concatenate([state_features, actions], axis=-1)
+        
 
         if return_int:
-            return np.concatenate([state_features, actions], axis=-1)[0]
+            return ret[0]
         else:
-            return np.concatenate([state_features, actions], axis=-1)[0]
+            return ret
 
         
 
@@ -193,6 +193,12 @@ class SA_Aggregator:
     def num_sa(self):
         return np.prod(self.shape())
 
+    def flatten_sa_table(self, table):
+        return self.agg_internal.flatten_s_table(table)
+
+    def unflatten_sa_table(self, table):
+        return self.agg_internal.unflatten_s_table(table)
+
 
 class S_Reward:
 
@@ -203,6 +209,8 @@ class S_Reward:
 
     def __call__(self, state, action):
         return self.reward_table[tuple(self.agg.s_to_features(state))]
+
+
         
 class SA_Reward:
 
@@ -211,12 +219,7 @@ class SA_Reward:
         self.reward_table = reward_table
 
     def __call__(self, state, action):
-
-
         rew = self.reward_table[tuple(self.agg.sa_to_features(state, action))]
-
-        # print(rew)
-
         return rew
 
 
@@ -245,6 +248,15 @@ def get_aggregator(env_name, bin_res=1):
         num_actions = 2
 
         return Aggregator(s_low, s_high, s_bins), SA_Aggregator_Disc(s_low, s_high, s_bins, num_actions)
+    
+    if env_name == "Pendulum-v1":
+        pass
+
+    if env_name == "AcroBot":
+        s_bins = [12, 12, 5, 12]
+        num_actions = 2
+    
+
 
     
     
@@ -282,41 +294,53 @@ def flatten_state(state):
 if __name__ == "__main__":
 
 # quick self-consistency test
-    agg = Aggregator([-1, -1], [1, 1], [12, 11])
-    test_states = np.random.uniform(-1, 1, (200, 2))
-    idx = agg.s_to_idx(test_states)
-    features = agg.s_to_features(test_states)    
-    assert np.array_equal(agg.features_to_idx(features), idx)
-    assert np.array_equal(agg.idx_to_features(idx), features)
+
+    def s_test():
+        agg = Aggregator([-1, -1], [1, 1], [12, 11])
+        test_states = np.random.uniform(-1, 1, (200, 2))
+        idx = agg.s_to_idx(test_states)
+        features = agg.s_to_features(test_states)    
+        assert np.array_equal(agg.features_to_idx(features), idx)
+        assert np.array_equal(agg.idx_to_features(idx), features)
 
 
 
-    test_state_table = np.arange(12*11)
-    test_state_table1 = np.zeros((12,11))
+        test_state_table = np.arange(12*11)
+        test_state_table1 = np.zeros((12,11))
 
-    for i in range(12*11):
-        test_state_table1[i%12, i//12] = i
+        for i in range(12*11):
+            test_state_table1[i%12, i//12] = i
 
-        assert np.all(np.array(unflatten_idx(i)) == agg.idx_to_features(i))
-        assert np.all(np.array(flatten_idx(i%12, i//12)) == agg.features_to_idx(np.array([i%12, i//12])))
+            assert np.all(np.array(unflatten_idx(i)) == agg.idx_to_features(i))
+            assert np.all(np.array(flatten_idx(i%12, i//12)) == agg.features_to_idx(np.array([i%12, i//12])))
 
-        assert agg.features_to_idx(np.array([i%12, i//12])) == i
-        assert np.all(agg.idx_to_features(i) == np.array([i%12, i//12]))
+            assert agg.features_to_idx(np.array([i%12, i//12])) == i
+            assert np.all(agg.idx_to_features(i) == np.array([i%12, i//12]))
 
-    print(agg.flatten_s_table(test_state_table1))
-    assert np.array_equal(agg.flatten_s_table(test_state_table1), test_state_table)
-    assert np.array_equal(unflatten_state(test_state_table),agg.unflatten_s_table(test_state_table))
-    assert np.array_equal(flatten_state(test_state_table1), agg.flatten_s_table(test_state_table1))
-    sa_agg = SA_Aggregator([-1, -1], [1, 1], [12,11], [-1], [1], [3])
+        print(agg.flatten_s_table(test_state_table1))
+        assert np.array_equal(agg.flatten_s_table(test_state_table1), test_state_table)
+        assert np.array_equal(unflatten_state(test_state_table),agg.unflatten_s_table(test_state_table))
+        assert np.array_equal(flatten_state(test_state_table1), agg.flatten_s_table(test_state_table1))
 
-    test_states = np.random.uniform(-1, 1, (200, 2))
-    test_actions = np.random.uniform(-1, 1, size=(200, 1))
-    idx = sa_agg.sa_to_idx(test_states, test_actions)
-    features = sa_agg.sa_to_features(test_states, test_actions)    
-    print(features.shape, idx.shape)
+    def sa_test():
+        sa_agg = SA_Aggregator([-1, -1], [1, 1], [12,11], [-1], [1], [3])
 
-    assert np.array_equal(sa_agg.features_to_idx(features), idx)
-    assert np.array_equal(sa_agg.idx_to_features(idx), features)
+        test_states = np.random.uniform(-1, 1, (200, 2))
+        test_actions = np.random.uniform(-1, 1, size=(200, 1))
+        idx = sa_agg.sa_to_idx(test_states, test_actions)
+        features = sa_agg.sa_to_features(test_states, test_actions)    
+        print(features.shape, idx.shape)
+        assert np.array_equal(sa_agg.features_to_idx(features), idx)
+        assert np.array_equal(sa_agg.idx_to_features(idx), features)
+
+
+        test_sa_table = np.arange(sa_agg.num_sa())
+        test_sa_table1 = sa_agg.unflatten_sa_table(test_sa_table)
+        for i in range(test_sa_table.size):
+            assert test_sa_table1[tuple(sa_agg.idx_to_features(i))] == test_sa_table[i]
+
+    s_test()
+    sa_test()
 
 
 

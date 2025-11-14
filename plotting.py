@@ -1,7 +1,10 @@
+from email import policy
 import numpy as np
 import matplotlib.pyplot as plt
 from policies import p_s_from_rollouts, p_sa_from_rollouts, sr_from_rollouts
 from aggregation import get_aggregator
+
+from scipy.stats import entropy
 
 
 def plot_heatmap(mat, xlabel="x coordinate", ylabel="Velocity [-0.7, 0.7]", title=None, show_ticks=True, save_path=None, cmap="turbo"):
@@ -59,23 +62,34 @@ def plot_heatmap(mat, xlabel="x coordinate", ylabel="Velocity [-0.7, 0.7]", titl
         return None
 
 
-
-
-def gen_visitation_plots(rollouts, save_dir):
+def compute_unique_states_visited(base_args, rollouts):
+    s_agg, sa_agg = get_aggregator(base_args["env_name"])
     # plot unique states visisted
-    pass
-
-def gen_l1_cov_plots(rollouts, base_args, adversery_args, save_dir):
-    # plot l1 coverability
-    l1_covs = []
-
+    unique_states_visisted = []
     for i in range(len(rollouts)):
-        epoch_rollouts = rollouts[i]
-        p_sa_from_rollouts(epoch_rollouts)
+        epoch_rollouts = rollouts[i]["all_rollouts"]
+
+        p_s = p_s_from_rollouts(epoch_rollouts, s_agg)
+
+        unique_states_visisted.append(np.count_nonzero(p_s)/np.size(p_s))
+    return unique_states_visisted
+
+def compute_policy_state_entropy(base_args, rollouts):
+    s_agg, sa_agg = get_aggregator(base_args["env_name"])
+    # plot unique states visisted
+    state_entropy = []
+    for i in range(len(rollouts)):
+        epoch_rollouts = rollouts[i]["all_rollouts"]
+
+        p_s = p_s_from_rollouts(epoch_rollouts, s_agg)
+        p_sa = p_sa_from_rollouts(epoch_rollouts, sa_agg)
+        print(p_s.sum(), p_sa.sum())
+        assert np.isclose(p_s.sum(), 1)
+        assert np.isclose(p_sa.sum(), 1)
+        state_entropy.append(entropy(p_s.flatten()))
+    return state_entropy
+
         
-
-
-    pass
 
 
 def gen_heatmap_epoch(rollouts, base_args, save_dir="out"):

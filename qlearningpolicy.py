@@ -58,7 +58,6 @@ class QLearningAgent:
         self.Q_w = np.zeros(shape=action_coder.feature_shape() + tilecoder.feature_shape() ) 
         self.gamma = gamma
         self.lr = lr/(self.stc.num_tilings())
-        print(self.lr)
         # all possible actions
         self.actions = self.atc.enumerate_actions()
 
@@ -87,6 +86,7 @@ class QLearningAgent:
     def learn_policy_internal(self, env, T, reward_fn):
         ep_reward = 0
         last_state, info = env.reset()
+
         last_state_features = self.stc.tile_state(last_state)
         action = self._select_action(last_state_features, epsilon=self.epsilon)
         action_features = self.atc.idx_from_act(action)
@@ -132,28 +132,39 @@ class QLearningAgent:
         
 
     # learn offline
-    def learn_offline_policy(self, transitions, reward_fn = None):
+    def learn_offline_policy(self, transitions, offline_epochs, reward_fn = None):
+        avg_reward = 0
+
+        t1 = []
         for trajectory in transitions:
-            s, a, r, s_prime = trajectory.dump()
-            avg_reward = 0
+            s,a,r,s_prime = trajectory.dump()
+            n = r.size
+            s_tiles = np.zeros(shape = (n, self.stc.num_tilings()), dtype=np.int32)
+            s_prime_tiles = np.zeros(shape = (n, self.stc.num_tilings()), dtype=np.int32)
 
-            for t in range(s.shape[0]):
-
-
+            for t in range(n):
+                s_tiles[t] = self.stc.tile_state(s[t])
+                s_prime_tiles[t] = self.stc.tile_state(s_prime[t])
                 if reward_fn != None:
-                    r[t] = reward_fn(s[t],a[t])
+                    r[t] = reward_fn(s[t], a[t])
+            
+            t1.append((s_tiles, a, r, s_prime_tiles, trajectory.terminated))
+            
 
-                avg_reward += r[t]
 
+        for _ in range(offline_epochs):
+            for trajectory in t1:
+                s, a, r, s_prime, terminated = trajectory
 
+                for t in range(s.shape[0]):
+                    avg_reward += r[t]
+                    af = self.atc.idx_from_act(a[t])
 
-                sf= self.stc.tile_state(s[t])
-                af = self.atc.idx_from_act(a[t])
-                s_primef =self.stc.tile_state(s_prime[t])
+                    self.Q_update(s[t], af, r[t], s_prime[t], (t==s.shape[0]-1) and terminated)
 
-                self.Q_update(sf, af, r[t], s_primef, (t==s.shape[0]-1)and trajectory.terminated)
+        
 
-            print(avg_reward)
+        print(avg_reward/(len(transitions)* offline_epochs))
         
 
 

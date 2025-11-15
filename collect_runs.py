@@ -1,3 +1,4 @@
+import enum
 from tkinter import W
 import plotting
 from policies import average_reward_from_rollouts, get_random_agent, sr_from_rollouts_sparse, p_s_from_rollouts, p_sa_from_rollouts, collect_rollouts
@@ -16,6 +17,45 @@ def setup_env(base_args):
     return env, s_agg, sa_agg
 
 
+def setup_env_exploring_starts(base_args):
+    env, s_agg, sa_agg = setup_env(base_args)
+
+    class ESW(gym.Wrapper):
+
+        def __init__(self,env, state_sampler, random_first_act = True):
+            self.state_sampler = state_sampler
+            self.random_first_action = random_first_act
+            self.env =env
+        
+        def reset(self, **kwargs):
+            state, info = env.reset(**kwargs)
+            new_state = self.state_sampler()
+            self.env.state=np.array(new_state, dtype=float)
+
+            if self.random_first_action:
+                first_action=self.env.action_space.sample()
+                state, reward, terminated, truncated, info = self.env.step(first_action)
+                return state, info
+            return self.env.state, info
+        
+    def mountaincar_state_sampler():
+        return np.random.uniform(
+            low=[-1.2, -0.07],
+            high=[0.6, 0.07]
+        )
+    def cartpole_state_sampler():
+        return np.random.uniform(
+            low=[-0.5, -1.0, -0.2, -1.0],
+            high=[0.5, 1.0, 0.2, 1.0]
+    )
+
+    if base_args["env_name"] == "MountainCarContinuous-v0":
+        return ESW(env, mountaincar_state_sampler), s_agg, sa_agg
+    if base_args["env_name"] == "CartPole-v1":
+        return ESW(env, cartpole_state_sampler), s_agg, sa_agg
+
+
+
 def setup_agent(base_args, agent_args):
     if agent_args["policy"] == "PolicyGrad":
         pass
@@ -31,13 +71,6 @@ def reward_shaping(reward_fn):
     new_reward /= (r_max - r_min)
     return new_reward
 
-def l1_reward(p_sa, sa_agg, l1_eps):
-    pass
-
-
-
-
-
 def collect_rollouts_from_options(env, base_args, option_args, options):
     rollouts = {
         "all_rollouts":[]
@@ -51,16 +84,10 @@ def learn_policy(env,base_args, option_args, reward_fn, transitions = None):
     option = setup_agent(base_args, option_args)
 
     if transitions != None:
-        for _ in range(option_args["offline_epochs"]):
-            option.learn_offline_policy(transitions, reward_fn)
+        option.learn_offline_policy(transitions, option_args["offline_epochs"], reward_fn)
 
     option.learn_policy(env, base_args["env_T"], option_args["online_epochs"], reward_fn, **option_args["learning_args"])
     return option
-
-
-
-
-
 
 def collect_run_eigenoptions(base_args, option_args):
     def eig_sparse(SR, k=131):
@@ -108,7 +135,8 @@ def collect_run_codex(base_args, option_args):
 
         # define reward fn
         uniform_density_sa = np.ones(sa_agg.shape())
-        l1_cov_reward = reward_shaping(1/(base_args["l1_eps"] * uniform_density_sa + p_sa))
+        l1_cov_reward = reward_shaping(1/(base_args["l1_eps"] * uniform_density_sa + p_sa)) + base_args["reward_shaping_constant"]
+
         plot_heatmap(l1_cov_reward.reshape(12, 11*3), save_path=f"{i}l1_reward.png")
         reward_fn = SA_Reward(sa_agg, l1_cov_reward)
         # learn policy
@@ -136,23 +164,36 @@ def collect_run_random(base_args):
 
 
 def compute_l1_from_run(base_args, adv_args, run):
-    s_agg, sa_agg = get_aggregator(env_name=base_args["env_name"], bin_res=1)
-    env = gym.make(base_args["env_name"], render_mode="rgb_array")
+    # s_agg, sa_agg = get_aggregator(env_name=base_args["env_name"], bin_res=1)
+    # env = gym.make(base_args["env_name"], render_mode="rgb_array")
 
+    # we allow the adverserial policy to "cheat" because we want sup(pi)
+
+    env, s_agg, sa_agg = setup_env_exploring_starts(base_args)
+    measure_env, _, _  = setup_env(base_args)
 
     l1_covs = []
 
-    for epoch in run:
+    for i, epoch in enumerate(run):
         epoch_rollouts = epoch["all_rollouts"]
         p_sa = p_sa_from_rollouts(epoch_rollouts, sa_agg)
 
         uniform_density_sa = np.ones(sa_agg.shape())
         l1_cov_reward = 1/(base_args["l1_eps"] * uniform_density_sa + p_sa) 
-        reward_fn = SA_Reward(sa_agg, reward_shaping(l1_cov_reward))
+        reward_fn = SA_Reward(sa_agg, reward_shaping(l1_cov_reward)+ base_args["reward_shaping_constant"]) 
+        plot_heatmap(l1_cov_reward.reshape(12, -1), save_path=f"epoch{i}adv_rew.png")
+
 
         adv_policy= setup_agent(base_args, adv_args)
+        adv_policy.learn_policy(env, base_args["env_T"], adv_args["online_epochs"], reward_fn, **adv_args["learning_args"] )
 
-        rollouts = collect_rollouts(env, adv_policy, base_args["env_T"], base_args["num_rollouts"], reward_fn, **adv_args["rollout_args"])
+        reward_fn = SA_Reward(sa_agg, reward_shaping(l1_cov_reward)) 
+        rollouts = collect_rollouts(measure_env, adv_policy, base_args["env_T"], base_args["num_rollouts"], reward_fn, **adv_args["rollout_args"])
+
+        p_sa = p_sa_from_rollouts(rollouts, sa_agg)
+        plot_heatmap(p_sa.reshape(12,-1), save_path=f"epoch{i}adv_p_sa.png")
+
+        
 
         l1_covs.append(average_reward_from_rollouts(rollouts))
     return l1_covs
@@ -170,6 +211,7 @@ def compute_l1_from_run(base_args, adv_args, run):
 
 
 if __name__ == "__main__":
+    np.set_printoptions(precision=4)
     mountaincar_args = {
         "l1_eps":1e-4, # regularizer epsilon for 
         "bin_res": 1,
@@ -177,7 +219,7 @@ if __name__ == "__main__":
         "env_T":200,
         "num_rollouts":100,
         "num_epochs": 5,
-        "reward_shaping_constant": 0
+        "reward_shaping_constant": -1
     }
     # base_args = {
     #     "gamma":0.999, # global discount factor
@@ -195,11 +237,12 @@ if __name__ == "__main__":
         "policy": "Qlearning",
         "gamma":0.999,
         "lr":0.01,
-        "online_epochs":3000,
+        "online_epochs":100,
         "offline_epochs":10,
 
+
         "learning_args": {
-            "epsilon_start": 1.0,
+            "epsilon_start": 0.5,
             "epsilon_decay": 0.999,
             "decay_every": 1,
             "verbose": True,
@@ -214,23 +257,23 @@ if __name__ == "__main__":
         "policy": "Qlearning",
         "gamma":0.999,
         "lr":0.01,
-        "online_epochs":5000,
-        "offline_epochs":10,
+        "online_epochs":10000,
+        "offline_epochs":0,
 
         "learning_args": {
-            "epsilon_start": 1.0,
+            "epsilon_start": 0.5,
             "epsilon_decay": 0.999,
             "decay_every": 3,
-            "verbose": True,
+            "verbose": False,
             "print_every": 100,
         },
         "rollout_args": {
             "epsilon": 0.2,
         }
     }
-    # options, trajectories =  collect_run_eigenoptions(mountaincar_args, Qlearning_args)
-    # l1_covs = compute_l1_from_run(mountaincar_args, Qlearning_args_l1, trajectories)
-    # print("l1_covs", l1_covs)
+    options, trajectories =  collect_run_eigenoptions(mountaincar_args, Qlearning_args)
+    l1_covs = compute_l1_from_run(mountaincar_args, Qlearning_args_l1, trajectories)
+    print("l1_covs", l1_covs)
 
 
     options, trajectories =  collect_run_codex(mountaincar_args, Qlearning_args)

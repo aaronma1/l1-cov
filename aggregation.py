@@ -223,13 +223,6 @@ class SA_Reward:
         return rew
 
 
-
-
-
-
-
-
-
 def get_aggregator(env_name, bin_res=1):
     if env_name == "MountainCarContinuous-v0":
         s_low = [-1.2, -0.07]

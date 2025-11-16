@@ -143,9 +143,6 @@ class SA_Aggregator_Disc:
         else:
             return ret
 
-        
-
-
     def idx_to_features(self, idxs):
         idxs = np.atleast_1d(idxs)
 
@@ -159,6 +156,13 @@ class SA_Aggregator_Disc:
     
     def num_sa(self):
         return np.prod(self.shape())
+
+    def flatten_sa_table(sa_table):
+        return sa_table.ravel(order="F")
+
+    def unflatten_sa_table(self, sa_table):
+        return sa_table.reshape(self.shape(), order='F')
+
 
     
 

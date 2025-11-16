@@ -160,46 +160,18 @@ def get_random_agent(env_name):
 
 
 def p_s_from_rollouts(rollouts, s_agg):
-
     p = np.zeros(s_agg.shape())
     for trajectory in rollouts:
-
         s, _, _, s_prime = trajectory.dump()
-
         s_f = s_agg.s_to_features(s)
         s_prime_f = s_agg.s_to_features(s_prime)
-
         p[tuple(s_f[0])] += 1
-
-        for i in range(s.shape[0]):
-            
-            p[s_prime_f[i][0], s_prime_f[i][1]] += 1
+        np.add.at(p, tuple(s_prime_f.T), 1)
 
     p /= p.sum()
     return p
-         
-
-def p_s_from_rollouts_1(rollouts, s_agg):
-
-    p = np.zeros(s_agg.num_states())
-    num_s =0
-    for trajectory in rollouts:
-        s, _, _, s_prime = trajectory.dump()
-        num_s += s.shape[0] + 1
-        s = s_agg.s_to_idx(s)
-        s_prime = s_agg.s_to_idx(s_prime)
-        p[s[0]] += 1
-
-        for idx in s_prime:
-            p[idx] += 1
-
-    p /= num_s
-    return s_agg.unflatten_s_table(p)
-        
-
 
 def p_sa_from_rollouts(rollouts, sa_agg):
-    
     p = np.zeros(sa_agg.shape())
     num_sa =0
     for trajectory in rollouts:
@@ -215,27 +187,8 @@ def p_sa_from_rollouts(rollouts, sa_agg):
     
 
 
+
 def sr_from_rollouts(rollouts, s_agg, gamma=0.99, step_size = 0.01):
-    
-    n = s_agg.num_states()
-    sr = np.zeros((n,n))
-
-    for trajectory in rollouts:
-
-        s, _, _, s_prime = trajectory.dump()
-        s_idx = s_agg.s_to_idx(s)
-        s_prime_idx = s_agg.s_to_idx(s_prime)
-
-        for t in range(s.shape[0]):
-            delta = gamma*sr[s_prime_idx[t], :] - sr[s_idx[t], :]
-            delta[s_idx[t]] += 1
-            sr[s_idx[t], :] += step_size * delta
-
-
-    return sr + 1e-9 * np.eye(n,n)
-
-
-def sr_from_rollouts_sparse(rollouts, s_agg, gamma=0.99, step_size = 0.01):
     
     n = s_agg.num_states()
 
@@ -253,6 +206,32 @@ def sr_from_rollouts_sparse(rollouts, s_agg, gamma=0.99, step_size = 0.01):
             sr[s_idx[t], :] += step_size * delta
 
     return sr.tocsr() + 1e-9 * eye(n, format="csr")
+
+def sa_sr_from_rollouts(rollouts, sa_agg, gamma=0.99, step_size = 0.01):
+    n = sa_agg.num_sa()
+
+    sr = lil_matrix((n,n), dtype=np.float32)
+
+    for trajectory in rollouts:
+
+        s, a, _, s_prime = trajectory.dump()
+    
+        s_prime = s_prime[1:]
+        a_prime = a[1:]
+
+        s = s[:-1]
+        a = a[:-1]
+
+        s_idx = sa_agg.sa_to_idx(s, a)
+        s_prime_idx = sa_agg.sa_to_idx(s_prime, a_prime)
+
+        for t in range(s_idx.shape[0]):
+            delta = gamma*sr[s_prime_idx[t], :].toarray().ravel() - sr[s_idx[t], :].toarray().ravel()
+            delta[s_idx[t]] += 1
+            sr[s_idx[t], :] += step_size * delta
+
+    return sr.tocsr() + 1e-9 * eye(n, format="csr")
+
 
 
 def average_reward_from_rollouts(rollouts, reward_fn = None):

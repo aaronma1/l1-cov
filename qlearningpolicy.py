@@ -1,5 +1,5 @@
-import tiles3 as tc
 import numpy as np
+import tiles3 as tc
 
 from policies import MTCCActionCoder, PendulumActionCoder, DiscreteActionCoder
 
@@ -24,7 +24,7 @@ class TileCoder:
         self.state_lower = np.array(low)
 
         self.iht = tc.IHT(self.iht_size)
-        
+    
         self.n_tilings = num_tilings
         self.n_tiles = num_tiles
 
@@ -132,7 +132,7 @@ class QLearningAgent:
         
 
     # learn offline
-    def learn_offline_policy(self, transitions, offline_epochs, reward_fn = None):
+    def learn_offline_policy(self, transitions, offline_epochs, reward_fn = None, verbose=False):
         avg_reward = 0
 
         t1 = []
@@ -149,8 +149,6 @@ class QLearningAgent:
                     r[t] = reward_fn(s[t], a[t])
             
             t1.append((s_tiles, a, r, s_prime_tiles, trajectory.terminated))
-            
-
 
         for _ in range(offline_epochs):
             for trajectory in t1:
@@ -163,8 +161,8 @@ class QLearningAgent:
                     self.Q_update(s[t], af, r[t], s_prime[t], (t==s.shape[0]-1) and terminated)
 
         
-
-        print(avg_reward/(len(transitions)* offline_epochs))
+        if verbose:
+            print(avg_reward/(len(transitions)* offline_epochs))
         
 
 

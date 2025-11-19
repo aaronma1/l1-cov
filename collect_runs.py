@@ -15,7 +15,6 @@ import numpy as np
 
 
 
-
 def setup_env(base_args):
     env = gym.make(base_args["env_name"], render_mode="rgb_array")
     s_agg, sa_agg = get_aggregator(base_args["env_name"], bin_res=1)
@@ -104,6 +103,8 @@ def collect_run_sa_eigenoptions(base_args, option_args):
     epoch_rollouts = []
     
     for i in range(base_args["num_epochs"]):
+        print(f"epoch{i}")
+
         epoch_rollouts.append(collect_rollouts_from_options(env,base_args,option_args, options))
         SR= sa_sr_from_rollouts(epoch_rollouts[-1]["all_rollouts"], sa_agg)
         p_sa =  p_sa_from_rollouts(epoch_rollouts[-1]["all_rollouts"], sa_agg)
@@ -112,16 +113,18 @@ def collect_run_sa_eigenoptions(base_args, option_args):
         eigenvectors , eigenvalues = eig_sparse(SR, k=10)
         top_eig = sa_agg.unflatten_sa_table(eigenvectors[:, 0])
 
+
         if np.dot(top_eig.flatten(), p_sa.flatten()) > 0:
             top_eig = -top_eig
         top_eig = reward_shaping(top_eig) + base_args["reward_shaping_constant"]
+
         reward = SA_Reward(sa_agg, top_eig)
         # learn an option
         options.append(learn_policy(env, base_args, option_args, reward, epoch_rollouts[-1]["all_rollouts"]))
 
     # collect last epoch rollout
     epoch_rollouts.append(collect_rollouts_from_options(env, base_args, option_args, options))
-    return options, epoch_rollouts
+    return epoch_rollouts
         
 def collect_run_codex(base_args, option_args):
     s_agg, sa_agg = get_aggregator(base_args["env_name"], bin_res=1)
@@ -133,6 +136,8 @@ def collect_run_codex(base_args, option_args):
         epoch_rollouts.append(collect_rollouts_from_options(env, base_args, option_args, options))
         p_sa = p_sa_from_rollouts(epoch_rollouts[-1]["all_rollouts"], sa_agg)
         # define reward fn
+
+
         uniform_density_sa = np.ones(sa_agg.shape())
         l1_cov_reward = reward_shaping(1/(base_args["l1_eps"] * uniform_density_sa + p_sa)) + base_args["reward_shaping_constant"]
 
@@ -142,7 +147,7 @@ def collect_run_codex(base_args, option_args):
 
 
     epoch_rollouts.append(collect_rollouts_from_options(env,base_args,option_args, options))
-    return options, epoch_rollouts
+    return epoch_rollouts, options
 
 def collect_run_random(base_args):
     s_agg, sa_agg = get_aggregator(base_args["env_name"], bin_res=1)
@@ -158,7 +163,7 @@ def collect_run_random(base_args):
     epoch_rollouts.append(collect_rollouts_from_options(env,base_args, {}, options))
 
 
-    return epoch_rollouts
+    return epoch_rollouts, options
 
 
 def setup_env_exploring_starts(base_args):
@@ -242,19 +247,19 @@ if __name__ == "__main__":
         "env_name": "MountainCarContinuous-v0",
         "env_T":200,
         "num_rollouts":400,
-        "num_epochs": 5,
+        "num_epochs": 15,
         "reward_shaping_constant": -1
     }
-    base_args = {
-        "gamma":0.999, # global discount factor
-        "l1_eps":1e-4, # regularizer epsilon for 
-        "bin_res": 1,
-        "env_name": "CartPole-v1",
-        "env_T":200,
-        "num_rollouts":400,
-        "num_epochs": 5,
-        "reward_shaping_constant": 0
-    }
+    # base_args = {
+    #     "gamma":0.999, # global discount factor
+    #     "l1_eps":1e-4, # regularizer epsilon for 
+    #     "bin_res": 1,
+    #     "env_name": "CartPole-v1",
+    #     "env_T":200,
+    #     "num_rollouts":400,
+    #     "num_epochs": 5,
+    #     "reward_shaping_constant": 0
+    # }
 
 
     Qlearning_args = {
@@ -296,11 +301,10 @@ if __name__ == "__main__":
             "epsilon": 0.2,
         }
     }
-    options, trajectories =  collect_run_sa_eigenoptions(mountaincar_args, Qlearning_args)
+    trajectories =  collect_run_codex(mountaincar_args, Qlearning_args)
+    l1_covs = compute_l1_from_run(mountaincar_args, Qlearning_args_l1, trajectories)
+    print("l1_covs", l1_covs)
+    trajectories =  collect_run_sa_eigenoptions(mountaincar_args, Qlearning_args)
     l1_covs = compute_l1_from_run(mountaincar_args, Qlearning_args_l1, trajectories)
     print("l1_covs", l1_covs)
 
-
-    options, trajectories =  collect_run_codex(mountaincar_args, Qlearning_args)
-    l1_covs = compute_l1_from_run(mountaincar_args, Qlearning_args_l1, trajectories)
-    print("l1_covs", l1_covs)

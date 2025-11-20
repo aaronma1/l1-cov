@@ -84,12 +84,11 @@ def collect_run_eigenoptions(base_args, option_args):
 
     # collect last epoch rollout
     epoch_rollouts.append(collect_rollouts_from_options(env, base_args, option_args, options))
-    return options, epoch_rollouts
+    return epoch_rollouts, options
 
 def collect_run_sa_eigenoptions(base_args, option_args):
     def eig_sparse(SR, k=131):
         SR = (SR+ SR.T)/2.0
-        
         eigenvalues, eigenvectors = eigsh(SR, sigma=None, k=k, which="LM")
         idx = np.argsort(-eigenvalues.real)
         eigenvalues = np.real_if_close(eigenvalues, tol=1e5)[idx]
@@ -124,7 +123,7 @@ def collect_run_sa_eigenoptions(base_args, option_args):
 
     # collect last epoch rollout
     epoch_rollouts.append(collect_rollouts_from_options(env, base_args, option_args, options))
-    return epoch_rollouts
+    return epoch_rollouts, options
         
 def collect_run_codex(base_args, option_args):
     s_agg, sa_agg = get_aggregator(base_args["env_name"], bin_res=1)
@@ -135,9 +134,6 @@ def collect_run_codex(base_args, option_args):
     for i in range(base_args["num_epochs"]):
         epoch_rollouts.append(collect_rollouts_from_options(env, base_args, option_args, options))
         p_sa = p_sa_from_rollouts(epoch_rollouts[-1]["all_rollouts"], sa_agg)
-        # define reward fn
-
-
         uniform_density_sa = np.ones(sa_agg.shape())
         l1_cov_reward = reward_shaping(1/(base_args["l1_eps"] * uniform_density_sa + p_sa)) + base_args["reward_shaping_constant"]
 
@@ -161,8 +157,6 @@ def collect_run_random(base_args):
         options+=[get_random_agent(env_name= base_args["env_name"])]
 
     epoch_rollouts.append(collect_rollouts_from_options(env,base_args, {}, options))
-
-
     return epoch_rollouts, options
 
 
@@ -215,7 +209,6 @@ def compute_l1_from_run(base_args, adv_args, run):
 
 
     l1_covs = []
-
     for i, epoch in enumerate(run):
         epoch_rollouts = epoch["all_rollouts"]
         p_sa = p_sa_from_rollouts(epoch_rollouts, sa_agg)
@@ -231,10 +224,8 @@ def compute_l1_from_run(base_args, adv_args, run):
         rollouts = collect_rollouts(measure_env, adv_policy, base_args["env_T"], base_args["num_rollouts"], measure_reward_fn, **adv_args["rollout_args"])
 
         p_sa = p_sa_from_rollouts(rollouts, sa_agg)
-
-        
-
         l1_covs.append(average_reward_from_rollouts(rollouts))
+
     return l1_covs
 
 
@@ -246,8 +237,8 @@ if __name__ == "__main__":
         "bin_res": 1,
         "env_name": "MountainCarContinuous-v0",
         "env_T":200,
-        "num_rollouts":400,
-        "num_epochs": 15,
+        "num_rollouts":2,
+        "num_epochs": 1,
         "reward_shaping_constant": -1
     }
     # base_args = {
@@ -301,10 +292,11 @@ if __name__ == "__main__":
             "epsilon": 0.2,
         }
     }
-    trajectories =  collect_run_codex(mountaincar_args, Qlearning_args)
+    trajectories, options = collect_run_codex(mountaincar_args, Qlearning_args)
+
     l1_covs = compute_l1_from_run(mountaincar_args, Qlearning_args_l1, trajectories)
     print("l1_covs", l1_covs)
-    trajectories =  collect_run_sa_eigenoptions(mountaincar_args, Qlearning_args)
-    l1_covs = compute_l1_from_run(mountaincar_args, Qlearning_args_l1, trajectories)
-    print("l1_covs", l1_covs)
+    # trajectories =  collect_run_sa_eigenoptions(mountaincar_args, Qlearning_args)
+    # l1_covs = compute_l1_from_run(mountaincar_args, Qlearning_args_l1, trajectories)
+    # print("l1_covs", l1_covs)
 

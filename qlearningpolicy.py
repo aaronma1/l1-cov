@@ -121,13 +121,14 @@ class QLearningAgent:
                      ):
         self.epsilon = epsilon_start
         for i in range(episodes):
-            ep_reward = self.learn_policy_internal(env, T, reward_fn)
+            ep_reward, terminated = self.learn_policy_internal(env, T, reward_fn)
             # decay epsilon
             if i % decay_every == 0:
                 self.epsilon *= epsilon_decay
             # print if debuging
             if verbose and i % print_every == 0:
-                print(ep_reward, self.epsilon, np.max(self.Q_w), np.min(self.Q_w))
+                # print("ep reward", ep_reward, terminated, self.epsilon, np.max(self.Q_w), np.min(self.Q_w))
+                print(f"epoch {i} episode reward: {ep_reward}, terminated: {terminated}, epsilon: {self.epsilon} max_q: {np.max(self.Q_w)}, min_q: {np.min(self.Q_w)}")
 
         
 
@@ -182,7 +183,7 @@ def get_qlearning_agent(env_name, gamma, lr):
         return QLearningAgent(cptc, cpac, gamma=gamma, lr=lr)
 
     if env_name == "Pendulum-v1":
-        pdtc = TileCoder(low=[-1.0, -1.0, -8.0], high=[1.0,1.0,8.0], num_tilings=32, num_tiles=16 )
+        pdtc = TileCoder(low=[-1.0, -1.0, -8.0], high=[1.0,1.0,8.0], num_tilings=64, num_tiles=16 )
         pdac = PendulumActionCoder()
         return QLearningAgent(pdtc, pdac, gamma=gamma, lr=lr)
     
@@ -196,17 +197,26 @@ def get_qlearning_agent(env_name, gamma, lr):
 
 
 
-# import itertools
-# import gymnasium as gym
-# if __name__ == "__main__":
-#     # env_name = "MountainCarContinuous-v0"
-#     # env = gym.make("MountainCarContinuous-v0", render_mode="rgb_array")
+import itertools
+import gymnasium as gym
+from policies import collect_rollouts
+if __name__ == "__main__":
+    # env_name = "MountainCarContinuous-v0"
+    # env = gym.make("MountainCarContinuous-v0", render_mode="rgb_array")
 
-#     env_name = "MountainCarContinuous-v0"
-#     env = gym.make(env_name, render_mode="rgb_array") 
+    env_name = "MountainCarContinuous-v0"
+    env_name = "Pendulum-v1"
 
-#     agent = get_qlearning_agent(env_name, 0.999, 0.1)
-#     agent.learn_policy(env, 200, 10000)
-    
-#     env = gym.wrappers.RecordVideo(env, video_folder="videos", episode_trigger=lambda e: True)
+    env = gym.make(env_name, render_mode="rgb_array") 
+    env_rec = gym.wrappers.RecordVideo(env, video_folder="videos", episode_trigger=lambda e: True)
+
+    agent = get_qlearning_agent(env_name, 0.999, 0.1)
+
+    agent.learn_policy(env, 200, 20000, epsilon_start=0.999, epsilon_decay=0.999, decay_every=20, print_every=100)
+    collect_rollouts(env_rec, agent, 200, 5, epsilon=0.0)
+    agent.learn_policy(env, 200, 20000, epsilon_start=0.300, epsilon_decay=0.999, decay_every=20, print_every=100)
+    collect_rollouts(env_rec, agent,  200, 5, epsilon=0.0)
+    agent.learn_policy(env, 200, 20000, epsilon_start=0.1, epsilon_decay=0.999, decay_every=20, print_every=100)
+    collect_rollouts(env_rec, agent, 200, 5, epsilon=0.0)
+    env_rec.close()
  

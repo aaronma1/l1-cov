@@ -102,32 +102,41 @@ class RandomAgent:
         return self.atc[np.random.choice(self.idx)]
 
 class Trajectory:
-    def __init__(self):
-        self.last_state = []
-        self.reward = []
-        self.action = []
-        self.next_state = []
+    def __init__(self, T=200):
+        self.last_state = None
+        self.reward = None
+        self.action = None
+        self.next_state = None
         self.terminated = False
+        self.t = 0
+        self.T = T
+    
     
     def add_transition(self, state, action, reward, next_state, terminated = False):
+        if self.t == 0:
+            self.last_state = np.zeros( (self.T,) + tuple(np.shape(state)))
+            self.action = np.zeros( (self.T,) + tuple(np.shape(action)))
+            self.reward = np.zeros(self.T)
+            self.next_state = np.zeros( (self.T,) + tuple(state.shape))
+        
+
         if self.terminated:
             return 
-
-        self.last_state.append(state)
-        self.action.append(action)
-        self.reward.append(reward)
-        self.next_state.append(next_state)
-
+        self.last_state[self.t] = state
+        self.action[self.t] = action
+        self.reward[self.t] = reward
+        self.next_state[self.t] = next_state
         self.terminated = self.terminated | terminated
 
+        self.t += 1
+
     def dump(self):
-        return np.array(self.last_state), np.array(self.action), np.array(self.reward), np.array(self.next_state)
+        return np.array(self.last_state[:self.t]), np.array(self.action[:self.t]), np.array(self.reward[:self.t]), np.array(self.next_state[:self.t])
 
 
 def collect_rollouts(env, agent, T, num_rollouts, reward_fn = None, epsilon=0.0):
-
     def _collect_rollout(env, agent, T, reward_fn, epsilon):
-        trajectory = Trajectory()
+        trajectory = Trajectory(T)
         last_state, _ = env.reset()
         for i in range(T):
             action = agent.select_action(last_state, epsilon)
@@ -141,9 +150,7 @@ def collect_rollouts(env, agent, T, num_rollouts, reward_fn = None, epsilon=0.0)
             if terminated or truncated:
                 return trajectory
 
-
         return trajectory
-          
     rollouts = []
     for i in range(num_rollouts):
         rollouts.append(_collect_rollout(env, agent, T, reward_fn, epsilon))

@@ -142,19 +142,22 @@ def collect_run_sa_eigenoptions(base_args, option_args):
         p_sa = p_sa_from_rollouts(epoch_rollouts[-1]["all_rollouts"], sa_agg)
 
         eigenvectors, eigenvalues = eig_sparse(SR, k=10)
-        top_eig = sa_agg.unflatten_sa_table(eigenvectors[:, 0])
 
-        if np.dot(top_eig.flatten(), p_sa.flatten()) > 0:
-            top_eig = -top_eig
-        top_eig = reward_shaping(top_eig) + base_args["reward_shaping_constant"]
 
-        reward = SA_Reward(sa_agg, top_eig)
-        # learn an option
-        options.append(
-            learn_policy(
-                env, base_args, option_args, reward, epoch_rollouts[-1]["all_rollouts"]
+        for n in range(base_args["n_eigenvectors"]):
+            nth_eig = sa_agg.unflatten_sa_table(eigenvectors[:, n])
+
+            if np.dot(top_eig.flatten(), p_sa.flatten()) > 0:
+                top_eig = -top_eig
+            top_eig = reward_shaping(top_eig) + base_args["reward_shaping_constant"]
+
+            reward = SA_Reward(sa_agg, top_eig)
+            # learn an option
+            options.append(
+                learn_policy(
+                    env, base_args, option_args, reward, epoch_rollouts[-1]["all_rollouts"]
+                )
             )
-        )
 
     # collect last epoch rollout
     epoch_rollouts.append(

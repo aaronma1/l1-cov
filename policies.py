@@ -3,6 +3,10 @@ import numpy as np
 
 from scipy.sparse import lil_matrix, eye
 
+
+from numba import njit
+
+
 class MTCCActionCoder:
     
     def num_actions(self):
@@ -238,6 +242,22 @@ class TrajectoryContainer:
         self.ts = self.ts[:self.current_idx]
         self.capacity = self.current_idx
 
+
+    def extend(self, other):
+        self.trim()
+        last_state, action, reward, next_state , ts, terminated= other.dump()
+
+        self.last_state = np.concat([self.last_state, last_state], axis=0)
+        self.action = np.concat([self.action, action], axis=0)
+        self.reward = np.concat([self.reward, reward], axis=0)
+        self.next_state = np.concat([self.next_state, next_state], axis=0)
+        self.terminated = np.concat([self.terminated, terminated])
+        self.ts = np.concat([self.ts, ts])
+        self.current_idx += other.current_idx
+
+
+
+
     # ----------------------
     # Iterators
     # ----------------------
@@ -257,30 +277,10 @@ class TrajectoryContainer:
         self._iter_idx += 1
         return traj
 
-    def batches(self, batch_size):
-        """Generator yielding batches of trajectories as arrays"""
-        for start in range(0, self.current_idx, batch_size):
-            end = min(start + batch_size, self.current_idx)
-            yield (self.last_state[start:end],
-                   self.action[start:end],
-                   self.reward[start:end],
-                   self.next_state[start:end],
-                   self.terminated[start:end],
-                   self.ts[start:end])
-
-
-
-
-
-
-
-
-
 
     
-
-
-
+    def dump(self):
+        return self.last_state[:self.current_idx], self.action[:self.current_idx], self.reward[:self.current_idx], self.next_state[:self.current_idx], self.ts[:self.current_idx], self.terminated[:self.current_idx],
 
 def collect_rollouts(env, agent, T, num_rollouts, reward_fn = None, epsilon=0.0):
     def _collect_rollout(env, agent, T, reward_fn, epsilon):
@@ -340,18 +340,10 @@ def p_sa_from_rollouts(rollouts, sa_agg):
     p /= num_sa
     return p
 
-    
-
-
-
 def sr_from_rollouts(rollouts, s_agg, gamma=0.99, step_size = 0.01):
-    
     n = s_agg.num_states()
-
     sr = lil_matrix((n,n), dtype=np.float32)
-
     for trajectory in rollouts:
-
         s, _, _, s_prime = trajectory.dump()
         s_idx = s_agg.s_to_idx(s)
         s_prime_idx = s_agg.s_to_idx(s_prime)
@@ -360,24 +352,41 @@ def sr_from_rollouts(rollouts, s_agg, gamma=0.99, step_size = 0.01):
             delta = gamma*sr[s_prime_idx[t], :].toarray().ravel() - sr[s_idx[t], :].toarray().ravel()
             delta[s_idx[t]] += 1
             sr[s_idx[t], :] += step_size * delta
-
     return sr.tocsr() + 1e-9 * eye(n, format="csr")
 
 def sa_sr_from_rollouts(rollouts, sa_agg, gamma=0.99, step_size = 0.01):
     n = sa_agg.num_sa()
-
     sr = lil_matrix((n,n), dtype=np.float32)
-
     for trajectory in rollouts:
-
         s, a, _, s_prime = trajectory.dump()
-    
         s_prime = s_prime[1:]
         a_prime = a[1:]
-
         s = s[:-1]
         a = a[:-1]
+        s_idx = sa_agg.sa_to_idx(s, a)
+        s_prime_idx = sa_agg.sa_to_idx(s_prime, a_prime)
+        for t in range(s_idx.shape[0]):
+            delta = gamma*sr[s_prime_idx[t], :].toarray().ravel() - sr[s_idx[t], :].toarray().ravel()
+            delta[s_idx[t]] += 1
+            sr[s_idx[t], :] += step_size * delta
 
+    return sr.tocsr() + 1e-9 * eye(n, format="csr")
+
+def sa_sr_from_rollouts_1(rollouts, sa_agg, gamma=0.99, step_size = 0.01):
+    n = sa_agg.num_sa()
+    s, a, s_prime,r = rollouts.dump()
+    s = s.flatten()
+    a = a.flatten()
+    s_prime = s_prime.flatten()
+    sr = lil_matrix((n,n), dtype=np.float32)
+
+    s_prime = s_prime[1:]
+    a_prime = a[1:]
+    s = s[:-1]
+    a = a[:-1]
+
+    @njit
+    def _internal(sr, s,a,s_prime, a_prime):
         s_idx = sa_agg.sa_to_idx(s, a)
         s_prime_idx = sa_agg.sa_to_idx(s_prime, a_prime)
 
@@ -386,7 +395,11 @@ def sa_sr_from_rollouts(rollouts, sa_agg, gamma=0.99, step_size = 0.01):
             delta[s_idx[t]] += 1
             sr[s_idx[t], :] += step_size * delta
 
-    return sr.tocsr() + 1e-9 * eye(n, format="csr")
+        return sr.tocsr() + 1e-9 * eye(n, format="csr")
+
+    return _internal(sr, s, a, s_prime, a_prime)
+
+
 
 
 

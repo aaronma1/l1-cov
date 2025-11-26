@@ -155,8 +155,8 @@ def experiments_mountaincar(SAVE_DIR, MAX_WORKERS, N_RUNS, epochs=15):
         "policy": "Qlearning",
         "gamma":0.999,
         "lr":0.01,
-        "online_epochs":5000,
-        "offline_epochs":20,
+        "online_epochs":0,
+        "offline_epochs":200,
 
 
         "learning_args": {

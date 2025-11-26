@@ -115,8 +115,6 @@ class Trajectory:
         self.t = 0
         self.T = T
 
-
-    #classmethod 
     @classmethod
     def from_container(cls, last_state, action,reward,next_state, terminated, t):
         traj = Trajectory(np.size(reward))
@@ -129,8 +127,6 @@ class Trajectory:
         traj.t = t
 
         return traj
-
-    
     
     def add_transition(self, state, action, reward, next_state, terminated = False):
         if self.t == 0:
@@ -138,8 +134,6 @@ class Trajectory:
             self.action = np.zeros( (self.T,) + tuple(np.shape(action)))
             self.reward = np.zeros(self.T)
             self.next_state = np.zeros( (self.T,) + tuple(state.shape))
-        
-
         if self.terminated:
             return 
         self.last_state[self.t] = state
@@ -147,7 +141,6 @@ class Trajectory:
         self.reward[self.t] = reward
         self.next_state[self.t] = next_state
         self.terminated = self.terminated | terminated
-
         self.t += 1
 
     def dump(self):
@@ -155,9 +148,6 @@ class Trajectory:
 
     def _dump_raw(self):
         return self.last_state, self.action, self.reward,self.next_state, self.terminated, self.t
-
-
-import numpy as np
 
 class TrajectoryContainer:
     def __init__(self, T, init_capacity=16):
@@ -304,6 +294,8 @@ def collect_rollouts(env, agent, T, num_rollouts, reward_fn = None, epsilon=0.0)
     for i in range(num_rollouts):
         rollouts.add_trajectory(_collect_rollout(env, agent, T, reward_fn, epsilon))
 
+    print(type(rollouts))
+
     return rollouts
 
 
@@ -371,33 +363,6 @@ def sa_sr_from_rollouts(rollouts, sa_agg, gamma=0.99, step_size = 0.01):
             sr[s_idx[t], :] += step_size * delta
 
     return sr.tocsr() + 1e-9 * eye(n, format="csr")
-
-def sa_sr_from_rollouts_1(rollouts, sa_agg, gamma=0.99, step_size = 0.01):
-    n = sa_agg.num_sa()
-    s, a, s_prime,r = rollouts.dump()
-    s = s.flatten()
-    a = a.flatten()
-    s_prime = s_prime.flatten()
-    sr = lil_matrix((n,n), dtype=np.float32)
-
-    s_prime = s_prime[1:]
-    a_prime = a[1:]
-    s = s[:-1]
-    a = a[:-1]
-
-    @njit
-    def _internal(sr, s,a,s_prime, a_prime):
-        s_idx = sa_agg.sa_to_idx(s, a)
-        s_prime_idx = sa_agg.sa_to_idx(s_prime, a_prime)
-
-        for t in range(s_idx.shape[0]):
-            delta = gamma*sr[s_prime_idx[t], :].toarray().ravel() - sr[s_idx[t], :].toarray().ravel()
-            delta[s_idx[t]] += 1
-            sr[s_idx[t], :] += step_size * delta
-
-        return sr.tocsr() + 1e-9 * eye(n, format="csr")
-
-    return _internal(sr, s, a, s_prime, a_prime)
 
 
 

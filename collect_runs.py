@@ -7,9 +7,9 @@ from policies import (
     average_reward_from_rollouts,
     get_random_agent,
     sr_from_rollouts,
-    sa_sr_from_rollouts,
     p_s_from_rollouts,
     p_sa_from_rollouts,
+    sa_sr_from_rollouts,
     collect_rollouts,
 )
 from qlearningpolicy import get_qlearning_agent
@@ -45,7 +45,7 @@ def reward_shaping(reward_fn):
 
 
 def collect_rollouts_from_options(env, base_args, option_args, options):
-    rollouts = {"all_rollouts": []}
+    rollouts = {"all_rollouts": None}
     for i, opt in enumerate(options):
         # rollouts[f"option{i}_rollouts"] = collect_rollouts(env, opt, base_args["env_T"], base_args["num_rollouts"], **option_args["rollout_args"])
         option_i_rollouts = collect_rollouts(
@@ -55,7 +55,12 @@ def collect_rollouts_from_options(env, base_args, option_args, options):
             base_args["num_rollouts"],
             **option_args["rollout_args"],
         )
-        rollouts["all_rollouts"].extend(option_i_rollouts)
+
+        if rollouts["all_rollouts"] == None:
+            rollouts["all_rollouts"] = option_i_rollouts
+        else:
+            rollouts["all_rollouts"].extend(option_i_rollouts)
+
     return rollouts
 
 
@@ -144,20 +149,19 @@ def collect_run_sa_eigenoptions(base_args, option_args):
         eigenvectors, eigenvalues = eig_sparse(SR, k=10)
 
 
-        for n in range(base_args["n_eigenvectors"]):
-            nth_eig = sa_agg.unflatten_sa_table(eigenvectors[:, n])
+        top_eig = sa_agg.unflatten_sa_table(eigenvectors[:, 0])
 
-            if np.dot(top_eig.flatten(), p_sa.flatten()) > 0:
-                top_eig = -top_eig
-            top_eig = reward_shaping(top_eig) + base_args["reward_shaping_constant"]
+        if np.dot(top_eig.flatten(), p_sa.flatten()) > 0:
+            top_eig = -top_eig
+        top_eig = reward_shaping(top_eig) + base_args["reward_shaping_constant"]
 
-            reward = SA_Reward(sa_agg, top_eig)
-            # learn an option
-            options.append(
-                learn_policy(
-                    env, base_args, option_args, reward, epoch_rollouts[-1]["all_rollouts"]
-                )
+        reward = SA_Reward(sa_agg, top_eig)
+        # learn an option
+        options.append(
+            learn_policy(
+                env, base_args, option_args, reward, epoch_rollouts[-1]["all_rollouts"]
             )
+        )
 
     # collect last epoch rollout
     epoch_rollouts.append(
@@ -176,6 +180,7 @@ def collect_run_codex(base_args, option_args):
         epoch_rollouts.append(
             collect_rollouts_from_options(env, base_args, option_args, options)
         )
+        
         p_sa = p_sa_from_rollouts(epoch_rollouts[-1]["all_rollouts"], sa_agg)
         uniform_density_sa = np.ones(sa_agg.shape())
         l1_cov_reward = (

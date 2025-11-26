@@ -183,7 +183,7 @@ def get_qlearning_agent(env_name, gamma, lr):
 
     if env_name == "Pendulum-v1":
         pdtc = TileCoder(low=[-1.0, -1.0, -8.0], high=[1.0,1.0,8.0], num_tilings=64, num_tiles=16 )
-        pdac = PendulumActionCoder()
+        pdac = PendulumActionCoder(num_bins=11)
         return QLearningAgent(pdtc, pdac, gamma=gamma, lr=lr)
     
     if env_name == "AcroBot":
@@ -209,13 +209,13 @@ if __name__ == "__main__":
     env = gym.make(env_name, render_mode="rgb_array") 
     env_rec = gym.wrappers.RecordVideo(env, video_folder="videos", episode_trigger=lambda e: True)
 
-    agent = get_qlearning_agent(env_name, 0.999, 0.1)
+    agent = get_qlearning_agent(env_name, 0.999, 0.01)
 
-    agent.learn_policy(env, 200, 20000, epsilon_start=0.999, epsilon_decay=0.999, decay_every=20, print_every=100)
+    agent.learn_policy(env, 200, 20000, epsilon_start=0.0, epsilon_decay=0.999, decay_every=20, print_every=100)
     collect_rollouts(env_rec, agent, 200, 5, epsilon=0.0)
     agent.learn_policy(env, 200, 20000, epsilon_start=0.300, epsilon_decay=0.999, decay_every=20, print_every=100)
-    collect_rollouts(env_rec, agent,  200, 5, epsilon=0.0)
+    collect_rollouts(env_rec, agent,  200, 5, epsilon=0.1)
     agent.learn_policy(env, 200, 20000, epsilon_start=0.1, epsilon_decay=0.999, decay_every=20, print_every=100)
-    collect_rollouts(env_rec, agent, 200, 5, epsilon=0.0)
+    collect_rollouts(env_rec, agent, 200, 5, epsilon=0.1)
     env_rec.close()
  

@@ -118,7 +118,19 @@ def compute_l1_from_experiment(base_args, adv_args, exp_dump_path, max_workers=1
             for _,f in enumerate(as_completed(futures)):
                 l1 = f.result()
                 all_l1_covs.append(l1)
+
     dump_pickle(all_l1_covs, save_path)
+
+
+
+######################################
+# Compute stuff from runs
+#######################V##############
+def analysis(save_dir, base_args):
+    
+
+    runs = list_pickle_runs(save_dir)
+    pass
 
 
 
@@ -155,7 +167,7 @@ def experiments_mountaincar(SAVE_DIR, MAX_WORKERS, N_RUNS, epochs=15):
             "print_every": 100,
         },
         "rollout_args": {
-            "epsilon": 0.2,
+            "epsilon": 0.0,
         }
     }
 
@@ -181,6 +193,15 @@ def experiments_mountaincar(SAVE_DIR, MAX_WORKERS, N_RUNS, epochs=15):
     save_dir_eigenoptions = os.path.join(SAVE_DIR, "eigenoptions/")
     os.makedirs(save_dir_eigenoptions, exist_ok=True)
 
+    params = {
+        "args_codex": (base_args, Qlearning_args_eigenoptions),
+        "args_eigenoptions": (base_args, Qlearning_args_eigenoptions),
+        "l1_cov_args": (base_args, Qlearning_args_adversery),
+    }
+    dump_pickle(params, os.path.join(SAVE_DIR, "params.pkl"))
+
+
+
     print("#### collecting eigenoptions rollouts ####")
     run_experiment_eigenoptions(base_args, Qlearning_args_eigenoptions, save_dir=save_dir_eigenoptions, max_workers=MAX_WORKERS, n_runs=N_RUNS)
     print("#### computing codex l1 coverage ####")
@@ -193,6 +214,7 @@ def experiments_mountaincar(SAVE_DIR, MAX_WORKERS, N_RUNS, epochs=15):
     run_experiment_codex(base_args, Qlearning_args_eigenoptions, save_dir=save_dir_codex, max_workers=MAX_WORKERS, n_runs=N_RUNS)
     print("#### computing codex l1 coverage ####")
     compute_l1_from_experiment(base_args, Qlearning_args_adversery, exp_dump_path=save_dir_codex, max_workers=MAX_WORKERS,)
+
 
 
 def experiments_mountaincar_highbins():

@@ -215,6 +215,7 @@ def collect_run_random(base_args):
     return epoch_rollouts, options
 
 
+
 def setup_env_exploring_starts(base_args):
     env = gym.make(base_args["env_name"], render_mode="rgb_array")
 

@@ -81,7 +81,7 @@ class ReinforcePolicy(nn.Module):
         return self.atc.idx_to_act(action)
 
 
-    def update_policy(self, running_reward):
+    def update_policy(self):
         R = 0
         policy_loss = [] #
         rewards = []
@@ -137,7 +137,9 @@ class ReinforcePolicy(nn.Module):
             if (i_episode == 0):
                 running_reward = ep_reward
             
-            loss = self.update_policy(running_reward)
+
+            if i_episode % 100 == 0:
+                loss = self.update_policy()
             running_loss = running_loss * (1-.005) + loss*0.05
 
             gc.collect()
@@ -161,10 +163,14 @@ if __name__ == "__main__":
     env_name = "Pendulum-v1"
     # Make environment.
     env = gym.make(env_name, render_mode="rgb_array")
-    mtac = PendulumActionCoder(num_bins=7)
-    policy = ReinforcePolicy( 0.999, 0.01, 3, mtac)
-    policy.learn_policy(env, None, 3000, 200)
-
-    env1 = gym.wrappers.RecordVideo(env, video_folder="videos", episode_trigger=lambda e: True)
-
+    mtac = PendulumActionCoder(num_bins=11)
+    policy = ReinforcePolicy( 0.99, 0.001, 3, mtac)
+    env1 = gym.wrappers.RecordVideo(env, video_folder="videos/reinforce_test", episode_trigger=lambda e: True)
+    policy.learn_policy(env, None, 10000, 200)
+    collect_rollouts(env1, policy, 200, 10, None, 0)
+    policy.learn_policy(env, None, 10000, 200)
+    collect_rollouts(env1, policy, 200, 10, None, 0)
+    policy.learn_policy(env, None, 10000, 200)
+    collect_rollouts(env1, policy, 200, 10, None, 0)
+    policy.learn_policy(env, None, 10000, 200)
     collect_rollouts(env1, policy, 200, 10, None, 0)

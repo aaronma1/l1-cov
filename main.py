@@ -7,6 +7,7 @@ import threading
 import tempfile
 
 import multiprocessing
+import math
 
 
 ######################################
@@ -32,7 +33,6 @@ def read_pickle(save_name):
     """
     with open(save_name, "rb") as f:
         obj = pickle.load(f)
-        print("object type:", type(obj))
         return obj
 
 
@@ -41,7 +41,7 @@ def read_pickle(save_name):
 ######################################
 
 def run_experiment_eigenoptions(base_args, option_args, save_dir, n_runs, max_workers=16):
-    n_files = n_runs//max_workers
+    n_files = math.ceil(n_runs/max_workers)
     for i in range(n_files):
         filepath = os.path.join(save_dir, f"part{i}_runs.pkl")
         if not os.path.exists(filepath):
@@ -63,9 +63,9 @@ def _run_experiment_eigenoptions(base_args, option_args, save_path, max_workers)
     dump_pickle(runs, save_path)
 
 def run_experiment_codex(base_args, option_args, save_dir, n_runs, max_workers):
-    n_files = n_runs//max_workers
+    n_files = math.ceil(n_runs/max_workers)
     for i in range(n_files):
-        filepath = os.path.join(save_dir, f"runs_part{i}.pkl")
+        filepath = os.path.join(save_dir, f"part{i}_runs.pkl")
         if not os.path.exists(filepath):
             _run_experiment_codex(base_args, option_args, filepath, max_workers)
 
@@ -73,19 +73,15 @@ def run_experiment_codex(base_args, option_args, save_dir, n_runs, max_workers):
 def _run_experiment_codex(base_args, option_args, save_path, max_workers=16):
     #load checkpoint
     runs = []
-    if os.path.exists(save_path):
-        runs = read_pickle(save_path)
-
-    n_runs -= len(runs)
-
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = [
             executor.submit(collect_run_codex, base_args=base_args, option_args=option_args)
-            for i in range(n_runs)
+            for i in range(max_workers)
         ]
         for i,f in enumerate(as_completed(futures)):
             transitions, options = f.result()
             runs.append(transitions)
+            print(f"done run {i}, {len(runs)}")
     dump_pickle(runs, save_path)
 
 
@@ -114,13 +110,15 @@ def compute_l1_from_experiment(base_args, adv_args, exp_dump_path, max_workers=1
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
             futures = [
                 executor.submit(compute_l1_from_run, base_args=base_args, adv_args=adv_args, run=runs[i])
-                for i in range(max_workers)
+                for i in range(len(runs))
             ]
 
             for _,f in enumerate(as_completed(futures)):
                 l1 = f.result()
                 all_l1_covs.append(l1)
-        dump_pickle(all_l1_covs, save_path)
+    dump_pickle(all_l1_covs, save_path)
+
+
 
 
 
@@ -135,7 +133,7 @@ def experiments_mountaincar():
         "env_name": "MountainCarContinuous-v0",
         "env_T":200,
         "num_rollouts":400,
-        "num_epochs": 10,
+        "num_epochs": 15,
         "reward_shaping_constant": -1
     }
 
@@ -179,12 +177,15 @@ def experiments_mountaincar():
         }
     }
 
-    # run_experiment_eigenoptions(base_args, Qlearning_args_eigenoptions, save_dir="out/mountaincar/eigenoptions", max_workers=MAX_WORKERS, n_runs=N_RUNS)
+    print("#### collecting eigenoptions rollouts ####")
+    run_experiment_eigenoptions(base_args, Qlearning_args_eigenoptions, save_dir="out/mountaincar/eigenoptions", max_workers=MAX_WORKERS, n_runs=N_RUNS)
+    print("#### computing codex l1 coverage ####")
     compute_l1_from_experiment(base_args, Qlearning_args_adversery, exp_dump_path="out/mountaincar/eigenoptions", max_workers=MAX_WORKERS)
 
-
-    # run_experiment_codex(base_args, Qlearning_args_eigenoptions, save_dir="out/mountaincar/codex", max_workers=MAX_WORKERS, n_runs=N_RUNS)
-    # compute_l1_from_experiment(base_args, Qlearning_args_adversery, exp_dump_path="out/mountaincar/codex", save_path="out/mountaincar/runs_codex_l1.pickle", max_workers=MAX_WORKERS,)
+    print("#### collecting codex rollouts ####")
+    run_experiment_codex(base_args, Qlearning_args_eigenoptions, save_dir="out/mountaincar/codex", max_workers=MAX_WORKERS, n_runs=N_RUNS)
+    print("#### computing codex l1 coverage ####")
+    compute_l1_from_experiment(base_args, Qlearning_args_adversery, exp_dump_path="out/mountaincar/codex", max_workers=MAX_WORKERS,)
 
     # Qlearning_args_l1 = {
     # # base_args = {
@@ -221,6 +222,6 @@ def experiments_mountaincar_highbins():
 if __name__ == "__main__":
 
     multiprocessing.set_start_method("spawn", force=True)
-    N_RUNS=100
+    N_RUNS=104
     MAX_WORKERS=8
     experiments_mountaincar()

@@ -169,7 +169,6 @@ class QLearningAgent:
 
 
 
-
 def get_qlearning_agent(env_name, gamma, lr):
     
     if env_name == "MountainCarContinuous-v0":

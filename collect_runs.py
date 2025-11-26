@@ -293,6 +293,22 @@ def compute_l1_from_run(base_args, adv_args, run):
 
     return l1_covs
 
+def compute_env_l1_cov(base_args, adv_args):
+    measure_env, s_agg, sa_agg = setup_env(base_args)
+    learn_env = setup_env_exploring_starts(base_args)
+
+    adv_policy = setup_agent(base_args, adv_args)
+
+
+    uniform_density_sa = np.ones(sa_agg.shape())
+    p_sa =  np.ones(sa_agg.shape())/sa_agg.num_sa()
+    l1_cov_reward = 1 / (base_args["l1_eps"] * uniform_density_sa + p_sa)
+    reward_fn = SA_Reward(
+        sa_agg, reward_shaping(l1_cov_reward) + base_args["reward_shaping_constant"]
+    )
+
+
+
 
 if __name__ == "__main__":
     np.set_printoptions(precision=4)
@@ -301,8 +317,8 @@ if __name__ == "__main__":
         "bin_res": 1,
         "env_name": "MountainCarContinuous-v0",
         "env_T": 200,
-        "num_rollouts": 400,
-        "num_epochs": 1,
+        "num_rollouts": 40,
+        "num_epochs": 4,
         "reward_shaping_constant": -1,
     }
     # base_args = {
@@ -354,6 +370,7 @@ if __name__ == "__main__":
         "print_every": 100,
     }
     trajectories, options = collect_run_codex(mountaincar_args, Qlearning_args)
+    print(len(trajectories))
 
     l1_covs = compute_l1_from_run(mountaincar_args, Qlearning_args_l1, trajectories)
     print("l1_covs", l1_covs)

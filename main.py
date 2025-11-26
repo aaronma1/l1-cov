@@ -45,7 +45,7 @@ def run_experiment_eigenoptions(base_args, option_args, save_dir, n_runs, max_wo
     for i in range(n_files):
         filepath = os.path.join(save_dir, f"part{i}_runs.pkl")
         if not os.path.exists(filepath):
-            _run_experiment_eigenoptions(base_args, option_args, filepath, max_workers)
+            _run_experiment_eigenoptions(base_args, option_args, filepath, max_workers,)
 
 def _run_experiment_eigenoptions(base_args, option_args, save_path, max_workers):
     runs = []
@@ -133,7 +133,7 @@ def experiments_mountaincar(SAVE_DIR="out"):
         "env_name": "MountainCarContinuous-v0",
         "env_T":200,
         "num_rollouts":400,
-        "num_epochs": 15,
+        "num_epochs": 5,
         "reward_shaping_constant": -1
     }
 
@@ -182,7 +182,7 @@ def experiments_mountaincar(SAVE_DIR="out"):
     print("#### collecting eigenoptions rollouts ####")
     run_experiment_eigenoptions(base_args, Qlearning_args_eigenoptions, save_dir=save_dir_eigenoptions, max_workers=MAX_WORKERS, n_runs=N_RUNS)
     print("#### computing codex l1 coverage ####")
-    compute_l1_from_experiment(base_args, Qlearning_args_adversery, exp_dump_path=save_dir_codex, max_workers=MAX_WORKERS)
+    compute_l1_from_experiment(base_args, Qlearning_args_adversery, exp_dump_path=save_dir_eigenoptions, max_workers=MAX_WORKERS)
 
     save_dir_codex = os.path.join(SAVE_DIR, "codex/")
     os.makedirs(save_dir_codex, exist_ok=True)
@@ -205,6 +205,6 @@ def experiments_mountaincar_highbins():
 if __name__ == "__main__":
 
     multiprocessing.set_start_method("spawn", force=True)
-    N_RUNS=104
+    N_RUNS=8
     MAX_WORKERS=8
     experiments_mountaincar(SAVE_DIR="out/mc")

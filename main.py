@@ -133,7 +133,7 @@ def experiments_mountaincar(SAVE_DIR="out"):
         "env_name": "MountainCarContinuous-v0",
         "env_T":200,
         "num_rollouts":400,
-        "num_epochs": 5,
+        "num_epochs": 15,
         "reward_shaping_constant": -1
     }
 

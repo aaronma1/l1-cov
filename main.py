@@ -126,7 +126,7 @@ def compute_l1_from_experiment(base_args, adv_args, exp_dump_path, max_workers=1
 # Experiment Configurations
 #######################V##############
 
-def experiments_mountaincar():
+def experiments_mountaincar(SAVE_DIR="out"):
     base_args = {
         "l1_eps":1e-4, # regularizer epsilon for 
         "bin_res": 1,
@@ -176,38 +176,21 @@ def experiments_mountaincar():
             "epsilon": 0.0,
         }
     }
+    save_dir_eigenoptions = os.path.join(SAVE_DIR, "eigenoptions/")
+    os.makedirs(save_dir_eigenoptions, exist_ok=True)
 
     print("#### collecting eigenoptions rollouts ####")
-    run_experiment_eigenoptions(base_args, Qlearning_args_eigenoptions, save_dir="out/mountaincar/eigenoptions", max_workers=MAX_WORKERS, n_runs=N_RUNS)
+    run_experiment_eigenoptions(base_args, Qlearning_args_eigenoptions, save_dir=save_dir_eigenoptions, max_workers=MAX_WORKERS, n_runs=N_RUNS)
     print("#### computing codex l1 coverage ####")
-    compute_l1_from_experiment(base_args, Qlearning_args_adversery, exp_dump_path="out/mountaincar/eigenoptions", max_workers=MAX_WORKERS)
+    compute_l1_from_experiment(base_args, Qlearning_args_adversery, exp_dump_path=save_dir_codex, max_workers=MAX_WORKERS)
+
+    save_dir_codex = os.path.join(SAVE_DIR, "codex/")
+    os.makedirs(save_dir_codex, exist_ok=True)
 
     print("#### collecting codex rollouts ####")
-    run_experiment_codex(base_args, Qlearning_args_eigenoptions, save_dir="out/mountaincar/codex", max_workers=MAX_WORKERS, n_runs=N_RUNS)
+    run_experiment_codex(base_args, Qlearning_args_eigenoptions, save_dir=save_dir_codex, max_workers=MAX_WORKERS, n_runs=N_RUNS)
     print("#### computing codex l1 coverage ####")
-    compute_l1_from_experiment(base_args, Qlearning_args_adversery, exp_dump_path="out/mountaincar/codex", max_workers=MAX_WORKERS,)
-
-    # Qlearning_args_l1 = {
-    # # base_args = {
-    #     "policy": "Qlearning",
-    #     "gamma":0.999,
-    #     "lr":0.01,
-    #     "online_epochs":10000,
-    #     "offline_epochs":0,
-
-    #     "learning_args": {
-    #         "epsilon_start": 0.5,
-    #         "epsilon_decay": 0.999,
-    #         "decay_every": 3,
-    #         "verbose": False,
-    #         "print_every": 100,
-    #     },
-    #     "rollout_args": {
-    #         "epsilon": 0.2,
-    #     }
-    # }
-    # compute_l1_from_experiment(base_args, Qlearning_args_l1, "out/mountaincar/transitions_mountaincar.pickle")
-
+    compute_l1_from_experiment(base_args, Qlearning_args_adversery, exp_dump_path=save_dir_codex, max_workers=MAX_WORKERS,)
 
 
 def experiments_mountaincar_highbins():
@@ -224,4 +207,4 @@ if __name__ == "__main__":
     multiprocessing.set_start_method("spawn", force=True)
     N_RUNS=104
     MAX_WORKERS=8
-    experiments_mountaincar()
+    experiments_mountaincar(SAVE_DIR="out/mc")

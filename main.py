@@ -9,6 +9,8 @@ import tempfile
 import multiprocessing
 import math
 
+import argparse
+
 
 ######################################
 # Pickle Helpers
@@ -126,14 +128,14 @@ def compute_l1_from_experiment(base_args, adv_args, exp_dump_path, max_workers=1
 # Experiment Configurations
 #######################V##############
 
-def experiments_mountaincar(SAVE_DIR="out"):
+def experiments_mountaincar(SAVE_DIR, MAX_WORKERS, N_RUNS, epochs=15):
     base_args = {
         "l1_eps":1e-4, # regularizer epsilon for 
         "bin_res": 1,
         "env_name": "MountainCarContinuous-v0",
         "env_T":200,
         "num_rollouts":400,
-        "num_epochs": 15,
+        "num_epochs": epochs,
         "reward_shaping_constant": -1
     }
 
@@ -201,10 +203,40 @@ def experiments_mountaincar_highbins():
     
 
 
+def parse_args():
+    parser = argparse.ArgumentParser(description="Job runner configuration")
+
+    parser.add_argument(
+        "--max_workers",
+        type=int,
+        required=True,
+        help="Number of worker processes to spawn"
+    )
+
+    parser.add_argument(
+        "--n_jobs",
+        type=int,
+        required=True,
+        help="Total number of jobs to run"
+    )
+
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=15,
+        help="Number of epochs to run (default: 1)"
+    )
+    parser.add_argument(
+        "--save_path",
+        type=str,
+        default="out",
+        help="Save path"
+    )
+
+    return parser.parse_args()
 
 if __name__ == "__main__":
 
+    args = parse_args()
     multiprocessing.set_start_method("spawn", force=True)
-    N_RUNS=8
-    MAX_WORKERS=8
-    experiments_mountaincar(SAVE_DIR="out/mc")
+    experiments_mountaincar(SAVE_DIR=args.save_path, N_RUNS=args.n_jobs,MAX_WORKERS=args.max_workers, epochs=args.epochs)

@@ -69,8 +69,9 @@ def learn_policy(env, base_args, option_args, reward_fn, transitions=None):
 
     if transitions != None:
         option.learn_offline_policy(
-            transitions, option_args["offline_epochs"], reward_fn
+            transitions, option_args["offline_epochs"], reward_fn, verbose=  option_args["learning_args"]["verbose"]
         )
+    _, sa_agg = get_aggregator(base_args["env_name"])
 
     option.learn_policy(
         env,
@@ -108,7 +109,7 @@ def collect_run_eigenoptions(base_args, option_args):
         top_eig = s_agg.unflatten_s_table(eigenvectors[:, 0])
         if np.dot(top_eig.flatten(), p_s.flatten()) > 0:
             top_eig = -top_eig
-        top_eig = reward_shaping(top_eig) + base_args["reward_shaping_constant"]
+        top_eig = reward_shaping(top_eig) 
         reward = S_Reward(s_agg, top_eig)
         # learn an option
         options.append(
@@ -122,7 +123,6 @@ def collect_run_eigenoptions(base_args, option_args):
         collect_rollouts_from_options(env, base_args, option_args, options)
     )
     return epoch_rollouts, options
-
 
 def collect_run_sa_eigenoptions(base_args, option_args):
     def eig_sparse(SR, k=131):
@@ -147,14 +147,10 @@ def collect_run_sa_eigenoptions(base_args, option_args):
         p_sa = p_sa_from_rollouts(epoch_rollouts[-1]["all_rollouts"], sa_agg)
 
         eigenvectors, eigenvalues = eig_sparse(SR, k=10)
-
-
         top_eig = sa_agg.unflatten_sa_table(eigenvectors[:, 0])
 
         if np.dot(top_eig.flatten(), p_sa.flatten()) > 0:
             top_eig = -top_eig
-        top_eig = reward_shaping(top_eig) + base_args["reward_shaping_constant"]
-
         reward = SA_Reward(sa_agg, top_eig)
         # learn an option
         options.append(
@@ -275,7 +271,7 @@ def compute_l1_from_run(base_args, adv_args, run):
         uniform_density_sa = np.ones(sa_agg.shape())
         l1_cov_reward = 1 / (base_args["l1_eps"] * uniform_density_sa + p_sa)
         reward_fn = SA_Reward(
-            sa_agg, reward_shaping(l1_cov_reward) + base_args["reward_shaping_constant"]
+            sa_agg, reward_shaping(l1_cov_reward) 
         )
 
         adv_policy = setup_agent(base_args, adv_args)
@@ -313,7 +309,7 @@ def compute_env_l1_cov(base_args, adv_args):
     p_sa =  np.ones(sa_agg.shape())/sa_agg.num_sa()
     l1_cov_reward = 1 / (base_args["l1_eps"] * uniform_density_sa + p_sa)
     reward_fn = SA_Reward(
-        sa_agg, reward_shaping(l1_cov_reward) + base_args["reward_shaping_constant"]
+        sa_agg, reward_shaping(l1_cov_reward) 
     )
 
 
@@ -326,9 +322,8 @@ if __name__ == "__main__":
         "bin_res": 1,
         "env_name": "MountainCarContinuous-v0",
         "env_T": 200,
-        "num_rollouts": 40,
+        "num_rollouts": 400,
         "num_epochs": 4,
-        "reward_shaping_constant": -1,
     }
     # base_args = {
     #     "gamma":0.999, # global discount factor
@@ -343,14 +338,14 @@ if __name__ == "__main__":
 
     Qlearning_args = {
         "policy": "Qlearning",
-        "gamma": 0.999,
+        "gamma": 0.99,
         "lr": 0.01,
         "online_epochs": 100,
-        "offline_epochs": 20,
+        "offline_epochs": 10,
         "learning_args": {
-            "epsilon_start": 0.5,
+            "epsilon_start": 1,
             "epsilon_decay": 0.999,
-            "decay_every": 1,
+            "decay_every": 5,
             "verbose": True,
             "print_every": 100,
         },
@@ -362,15 +357,15 @@ if __name__ == "__main__":
     Qlearning_args_l1 = {
         # base_args = {
         "policy": "Qlearning",
-        "gamma": 0.999,
+        "gamma": 0.99,
         "lr": 0.01,
-        "online_epochs": 10000,
+        "online_epochs": 50000,
         "offline_epochs": 0,
         "learning_args": {
             "epsilon_start": 0.5,
             "epsilon_decay": 0.999,
             "decay_every": 3,
-            "verbose": True,
+            "verbose": False,
             "print_every": 100,
         },
         "rollout_args": {
@@ -378,7 +373,7 @@ if __name__ == "__main__":
         },
         "print_every": 100,
     }
-    trajectories, options = collect_run_codex(mountaincar_args, Qlearning_args)
+    trajectories, options = collect_run_sa_eigenoptions(mountaincar_args, Qlearning_args)
     print(len(trajectories))
 
     l1_covs = compute_l1_from_run(mountaincar_args, Qlearning_args_l1, trajectories)

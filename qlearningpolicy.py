@@ -1,4 +1,6 @@
 import numpy as np
+from plotting import plot_heatmap
+from numba import jit, njit
 import tiles3 as tc
 
 from policies import MTCCActionCoder, PendulumActionCoder, DiscreteActionCoder
@@ -50,12 +52,15 @@ class TileCoder:
         return self.n_tilings
 
 
+
+
+
 class QLearningAgent:
 
     def __init__(self, tilecoder, action_coder, gamma, lr):
         self.stc =  tilecoder
         self.atc = action_coder
-        self.Q_w = np.zeros(shape=action_coder.feature_shape() + tilecoder.feature_shape() ) 
+        self.Q_w = np.ones(shape=action_coder.feature_shape() + tilecoder.feature_shape() ) * 1/(1-gamma)
         self.gamma = gamma
         self.lr = lr/(self.stc.num_tilings())
         # all possible actions
@@ -74,6 +79,7 @@ class QLearningAgent:
             return self.atc.idx_to_act(np.random.choice(self.actions))
         else:
             return self.atc.idx_to_act(np.argmax(self.Q_values(state_features)))
+
 
     def Q_update(self, last_state_features, action_features, reward, state_features, terminated):
         td_target = reward
@@ -133,38 +139,94 @@ class QLearningAgent:
         
 
     # learn offline
-    def learn_offline_policy(self, transitions, offline_epochs, reward_fn = None, verbose=False):
-        avg_reward = 0
+    def learn_offline_policy(self, rollouts, offline_epochs, reward_fn = None, verbose=False):
+        print("learning offline")
 
-        t1 = []
-        for trajectory in transitions:
+        trajectory_tiles = []
+        for trajectory in rollouts:
             s,a,r,s_prime = trajectory.dump()
             n = r.size
             s_tiles = np.zeros(shape = (n, self.stc.num_tilings()), dtype=np.int32)
             s_prime_tiles = np.zeros(shape = (n, self.stc.num_tilings()), dtype=np.int32)
+            a_idx = np.zeros(shape = n, dtype=np.int32)
 
             for t in range(n):
                 s_tiles[t] = self.stc.tile_state(s[t])
                 s_prime_tiles[t] = self.stc.tile_state(s_prime[t])
+                a_idx[t] = self.atc.idx_from_act(a[t])
                 if reward_fn != None:
                     r[t] = reward_fn(s[t], a[t])
             
-            t1.append((s_tiles, a, r, s_prime_tiles, trajectory.terminated))
+            trajectory_tiles.append((s_tiles, a_idx, r, s_prime_tiles, trajectory.terminated))
 
-        for _ in range(offline_epochs):
-            for trajectory in t1:
-                s, a, r, s_prime, terminated = trajectory
 
-                for t in range(s.shape[0]):
-                    avg_reward += r[t]
-                    af = self.atc.idx_from_act(a[t])
+        @njit
+        def _internal(Q, trajectory_tiles, offline_epochs, lr, gamma):
+            avg_reward = 0
+            for _ in range(offline_epochs):
+                for s,a,r,s_prime,terminated in trajectory_tiles:
 
-                    self.Q_update(s[t], af, r[t], s_prime[t], (t==s.shape[0]-1) and terminated)
+                    for t in range(s.shape[0]):
+                        avg_reward += r[t]
+
+                        td_target = r[t]
+                        if not (t == s.shape[0]-1 and terminated):
+                            # td_target += self.gamma * np.max(self.Q_values(state_features))
+                            td_target += gamma * np.max(np.sum(Q[:, s_prime[t]], axis=-1))
+                        #delta = td_target - self.Q_values(last_state_features)[action_features]
+                        delta = td_target - np.sum(Q[:, s[t]], axis=-1)[a[t]]
+                        Q[a[t]][s[t]] += lr * delta
+            return Q, avg_reward/(len(trajectory_tiles) *offline_epochs)
+
+        self.Q_w, avg_reward = _internal(self.Q_w, trajectory_tiles, offline_epochs, self.lr, self.gamma )
+
+        # for _ in range(offline_epochs):
+        #     for trajectory in trajectory_tiles:
+        #         s, a, r, s_prime, terminated = trajectory
+
+        #         for t in range(s.shape[0]):
+        #             avg_reward += r[t]
+        #             self.Q_update(s[t], a, r[t], s_prime[t], (t==s.shape[0]-1) and terminated)
 
         
-        if verbose:
-            print(avg_reward/(len(transitions)* offline_epochs))
-        
+        print("avg reward", avg_reward)
+
+
+    def plot_qtable(self, sa_agg, save_path=None):
+
+        state_low = [-1.2, -0.07]
+        state_high = [0.6, 0.07]
+
+        state_low  = np.asarray(state_low)
+        state_high = np.asarray(state_high)
+
+        nx = 100
+        ny = 100
+
+        xs = np.linspace(state_low[0], state_high[0], nx)
+        ys = np.linspace(state_low[1], state_high[1], ny)
+
+        Q_sa_table = np.zeros(sa_agg.shape())
+        Q_sa_counts = np.zeros(sa_agg.shape())
+
+        nA = sa_agg.act_space[0]
+
+
+        for ix, x in enumerate(xs):
+            for iy, y in enumerate(ys):
+
+                s = np.array([[x, y]])
+
+                # Evaluate Q(s,a)
+                for a in range(nA):
+
+                    Q_value = self.Q_values(self.stc.tile_state(np.array([x, y])))[a]
+
+                    Q_sa_table[tuple(sa_agg.sa_to_features(np.array([x, y]), np.array(a)))] += Q_value
+                    Q_sa_counts[tuple(sa_agg.sa_to_features(np.array([x, y]), np.array(a)))] += 1
+        Q_sa_table = Q_sa_table/(Q_sa_counts + 1e-9)
+
+        plot_heatmap(Q_sa_table.reshape(12, -1), save_path=save_path)
 
 
 
@@ -172,7 +234,7 @@ class QLearningAgent:
 def get_qlearning_agent(env_name, gamma, lr):
     
     if env_name == "MountainCarContinuous-v0":
-        mctc = TileCoder([-1.2, -0.07],[0.6, 0.07], num_tilings=8, num_tiles=8)
+        mctc = TileCoder([-1.2, -0.07],[0.6, 0.07], num_tilings=16, num_tiles=8)
         mcac = MTCCActionCoder()
         return QLearningAgent(mctc,mcac, gamma,lr )
 

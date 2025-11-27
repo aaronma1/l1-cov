@@ -213,10 +213,10 @@ class S_Reward:
 class SA_Reward:
     def __init__(self, agg, reward_table):
         self.agg = agg
-        self.reward_table = reward_table
+        self.reward_table = agg.flatten_sa_table(reward_table)
 
     def __call__(self, state, action):
-        rew = self.reward_table[tuple(self.agg.sa_to_features(state, action))]
+        rew = self.reward_table[self.agg.sa_to_idx(state, action)]
         return rew
 
 

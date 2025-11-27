@@ -1,10 +1,10 @@
 from aggregation import get_aggregator
 import numpy as np
 
-from scipy.sparse import lil_matrix, eye
+from scipy.sparse import lil_matrix, csr_matrix, eye
 
 
-from numba import njit
+from numba import njit, jit
 
 
 class MTCCActionCoder:
@@ -150,7 +150,7 @@ class Trajectory:
         return self.last_state, self.action, self.reward,self.next_state, self.terminated, self.t
 
 class TrajectoryContainer:
-    def __init__(self, T, init_capacity=16):
+    def __init__(self, T, init_capacity=200):
         self.T = T
         self.capacity = init_capacity
         self.current_idx = 0
@@ -232,6 +232,8 @@ class TrajectoryContainer:
         self.ts = self.ts[:self.current_idx]
         self.capacity = self.current_idx
 
+    def dump(self):
+        return self.last_state[:self.current_idx], self.action[:self.current_idx], self.reward[:self.current_idx], self.next_state[:self.current_idx], self.ts[:self.current_idx], self.terminated[:self.current_idx],
 
     def extend(self, other):
         self.trim()
@@ -241,8 +243,10 @@ class TrajectoryContainer:
         self.action = np.concat([self.action, action], axis=0)
         self.reward = np.concat([self.reward, reward], axis=0)
         self.next_state = np.concat([self.next_state, next_state], axis=0)
-        self.terminated = np.concat([self.terminated, terminated])
-        self.ts = np.concat([self.ts, ts])
+        self.terminated = np.concat([self.terminated, terminated], axis=0)
+        self.ts = np.concat([self.ts, ts], axis=0)
+
+
         self.current_idx += other.current_idx
 
 
@@ -269,8 +273,6 @@ class TrajectoryContainer:
 
 
     
-    def dump(self):
-        return self.last_state[:self.current_idx], self.action[:self.current_idx], self.reward[:self.current_idx], self.next_state[:self.current_idx], self.ts[:self.current_idx], self.terminated[:self.current_idx],
 
 def collect_rollouts(env, agent, T, num_rollouts, reward_fn = None, epsilon=0.0):
     def _collect_rollout(env, agent, T, reward_fn, epsilon):
@@ -281,21 +283,15 @@ def collect_rollouts(env, agent, T, num_rollouts, reward_fn = None, epsilon=0.0)
             state, reward, terminated, truncated, info = env.step(action)
             if reward_fn != None:
                 reward = reward_fn(state, action)
-            
             trajectory.add_transition(last_state, action, reward, state, terminated)
             last_state = state
-
             if terminated or truncated:
                 return trajectory
-
         return trajectory
     rollouts = TrajectoryContainer(T, init_capacity=num_rollouts)
 
     for i in range(num_rollouts):
         rollouts.add_trajectory(_collect_rollout(env, agent, T, reward_fn, epsilon))
-
-    print(type(rollouts))
-
     return rollouts
 
 
@@ -335,37 +331,85 @@ def p_sa_from_rollouts(rollouts, sa_agg):
 def sr_from_rollouts(rollouts, s_agg, gamma=0.99, step_size = 0.01):
     n = s_agg.num_states()
     sr = lil_matrix((n,n), dtype=np.float32)
+
+
     for trajectory in rollouts:
         s, _, _, s_prime = trajectory.dump()
         s_idx = s_agg.s_to_idx(s)
         s_prime_idx = s_agg.s_to_idx(s_prime)
 
+        prev = sr[s_idx[0], :].toarray().ravel()
         for t in range(s.shape[0]):
-            delta = gamma*sr[s_prime_idx[t], :].toarray().ravel() - sr[s_idx[t], :].toarray().ravel()
+            next = sr[s_prime_idx[t], :].toarray().ravel()
+            delta = gamma*next - prev 
             delta[s_idx[t]] += 1
             sr[s_idx[t], :] += step_size * delta
     return sr.tocsr() + 1e-9 * eye(n, format="csr")
 
-def sa_sr_from_rollouts(rollouts, sa_agg, gamma=0.99, step_size = 0.01):
+
+
+import time
+def sa_sr_from_rollouts(rollouts, sa_agg, gamma=0.99, step_size=0.01):
+
+
+    n = sa_agg.num_sa()
+    sr = lil_matrix((n, n), dtype=np.float32)
+
+    # dense work buffers
+    curr = np.zeros(n, dtype=np.float32)
+    nxt  = np.zeros(n, dtype=np.float32)
+    delta = np.zeros(n, dtype=np.float32)
+
+    for trajectory in rollouts:
+        s, a, _, sp = trajectory.dump()
+
+        # Correct alignment
+        s_idx        = sa_agg.sa_to_idx(s[:-1], a[:-1])
+        s_prime_idx  = sa_agg.sa_to_idx(sp[:-1], a[1:])
+
+        for t in range(len(s_idx)):
+            i  = s_idx[t]
+            ip = s_prime_idx[t]
+
+            # load current SR row into dense buffer
+            curr[:] = 0.0
+            if sr.rows[i]:
+                curr[sr.rows[i]] = sr.data[i]
+
+            # load successor SR row into buffer
+            nxt[:] = 0.0
+            if sr.rows[ip]:
+                nxt[sr.rows[ip]] = sr.data[ip]
+
+            # TD update:  delta = 1 + gamma * nxt - curr
+            delta[:] = gamma * nxt - curr
+            delta[i] += 1.0
+
+            # new row = curr + step_size * delta
+            curr[:] = curr + step_size * delta
+
+            # write dense row back to sparse
+            nz = curr.nonzero()[0]
+            sr.rows[i] = nz.tolist()
+            sr.data[i] = curr[nz].tolist()
+    return sr.tocsr() + 1e-9 * eye(n, format="csr")
+
+
+def sa_sr_from_rollouts_correct(rollouts, sa_agg, gamma=0.99, step_size = 0.01):
     n = sa_agg.num_sa()
     sr = lil_matrix((n,n), dtype=np.float32)
     for trajectory in rollouts:
         s, a, _, s_prime = trajectory.dump()
-        s_prime = s_prime[1:]
-        a_prime = a[1:]
-        s = s[:-1]
-        a = a[:-1]
-        s_idx = sa_agg.sa_to_idx(s, a)
-        s_prime_idx = sa_agg.sa_to_idx(s_prime, a_prime)
+        s_idx = sa_agg.sa_to_idx(s[:-1], a[:-1])
+        s_prime_idx = sa_agg.sa_to_idx(s_prime[:-1], a[1:])
+        assert np.array_equal(s_idx[1:], s_prime_idx[:-1])
+
         for t in range(s_idx.shape[0]):
             delta = gamma*sr[s_prime_idx[t], :].toarray().ravel() - sr[s_idx[t], :].toarray().ravel()
             delta[s_idx[t]] += 1
             sr[s_idx[t], :] += step_size * delta
 
     return sr.tocsr() + 1e-9 * eye(n, format="csr")
-
-
-
 
 
 def average_reward_from_rollouts(rollouts, reward_fn = None):
@@ -378,11 +422,6 @@ def average_reward_from_rollouts(rollouts, reward_fn = None):
             for t in range(s.shape[0]):
                 avg_reward += reward_fn(s[t],a[t])
     return avg_reward/len(rollouts)
-
-
-
-
-
 
 
 
@@ -404,8 +443,7 @@ if __name__ == "__main__":
     sr = sr_from_rollouts(rollouts, s_agg)
 
     p1 = s_agg.flatten_state_table(p)
-    p2 = s_agg.unflatten_state_table(p)
-
+    p2 = s_agg.shape()
 
 
 

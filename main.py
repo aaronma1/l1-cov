@@ -46,12 +46,13 @@ def run_experiment_eigenoptions(base_args, option_args, save_dir, n_runs, max_wo
     n_files = math.ceil(n_runs/max_workers)
     for i in range(n_files):
         filepath = os.path.join(save_dir, f"part{i}_runs.pkl")
+        filepath_options = os.path.join(save_dir, f"part{i}_options.pkl")
         if not os.path.exists(filepath):
-            _run_experiment_eigenoptions(base_args, option_args, filepath, max_workers,)
+            _run_experiment_eigenoptions(base_args, option_args, filepath, filepath_options, max_workers,)
 
-def _run_experiment_eigenoptions(base_args, option_args, save_path, max_workers):
+def _run_experiment_eigenoptions(base_args, option_args, save_path, save_path_options, max_workers):
     runs = []
-    options = []
+    all_options = []
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = [
             executor.submit(collect_run_sa_eigenoptions, base_args=base_args, option_args=option_args)
@@ -61,21 +62,25 @@ def _run_experiment_eigenoptions(base_args, option_args, save_path, max_workers)
         for i,f in enumerate(as_completed(futures)):
             transitions, options = f.result()
             runs.append(transitions)
+            all_options.append(options)
             print(f"done run {i}")
 
     dump_pickle(runs, save_path)
+    dump_pickle(all_options, save_path_options )
 
 def run_experiment_codex(base_args, option_args, save_dir, n_runs, max_workers):
     n_files = math.ceil(n_runs/max_workers)
     for i in range(n_files):
         filepath = os.path.join(save_dir, f"part{i}_runs.pkl")
+        filepath_options = os.path.join(save_dir, f"part{i}_options.pkl")
         if not os.path.exists(filepath):
-            _run_experiment_codex(base_args, option_args, filepath, max_workers)
+            _run_experiment_codex(base_args, option_args, filepath, filepath_options, max_workers)
 
 
-def _run_experiment_codex(base_args, option_args, save_path, max_workers=16):
+def _run_experiment_codex(base_args, option_args, save_path, save_path_options, max_workers=16):
     #load checkpoint
     runs = []
+    all_options =[]
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = [
             executor.submit(collect_run_codex, base_args=base_args, option_args=option_args)
@@ -84,8 +89,10 @@ def _run_experiment_codex(base_args, option_args, save_path, max_workers=16):
         for i,f in enumerate(as_completed(futures)):
             transitions, options = f.result()
             runs.append(transitions)
+            all_options.append(options)
             print(f"done run {i}, {len(runs)}")
     dump_pickle(runs, save_path)
+    dump_pickle(all_options, save_path_options)
 
 
 ######################################
@@ -164,7 +171,7 @@ def experiments_mountaincar(SAVE_DIR, MAX_WORKERS, N_RUNS, epochs=15):
             "epsilon_start": 0.5,
             "epsilon_decay": 0.999,
             "decay_every": 1,
-            "verbose": True,
+            "verbose": False,
             "print_every": 100,
         },
         "rollout_args": {
@@ -177,7 +184,7 @@ def experiments_mountaincar(SAVE_DIR, MAX_WORKERS, N_RUNS, epochs=15):
         "policy": "Qlearning",
         "gamma":0.999,
         "lr":0.01,
-        "online_epochs":10000,
+        "online_epochs":30000,
         "offline_epochs":0,
 
         "learning_args": {

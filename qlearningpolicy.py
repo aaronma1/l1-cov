@@ -74,11 +74,14 @@ class QLearningAgent:
     def select_action(self, state, epsilon=0.0):
        return self._select_action(self.stc.tile_state(state), epsilon)
 
+
+
     def _select_action(self, state_features, epsilon=0.0):
         if np.random.rand() < epsilon:
             return self.atc.idx_to_act(np.random.choice(self.actions))
         else:
-            return self.atc.idx_to_act(np.argmax(self.Q_values(state_features)))
+            Q = self.Q_values(state_features)
+            return self.atc.idx_to_act(np.random.choice(np.where(Q == Q.max())[0]))
 
 
     def Q_update(self, last_state_features, action_features, reward, state_features, terminated):
@@ -101,7 +104,7 @@ class QLearningAgent:
             # take a step
             state, reward, terminated, truncated, info = env.step(action)
             if reward_fn != None:
-                reward = reward_fn(last_state, action)
+                reward = reward_fn(last_state, action, state)
             ep_reward += reward
             state_features = self.stc.tile_state(state)
             # compute td target and update Q
@@ -126,21 +129,30 @@ class QLearningAgent:
                      verbose=True, print_every=200, epsilon_decay=0.999, decay_every=1, epsilon_start = 1.0
                      ):
         self.epsilon = epsilon_start
+
+
+        running_reward = 0
         for i in range(episodes):
             ep_reward, terminated = self.learn_policy_internal(env, T, reward_fn)
+
+
+            if i == 0:
+                running_reward = ep_reward
+            else:
+                running_reward = running_reward * 0.99 + ep_reward * 0.01 
+
             # decay epsilon
             if i % decay_every == 0:
                 self.epsilon *= epsilon_decay
             # print if debuging
             if verbose and i % print_every == 0:
                 # print("ep reward", ep_reward, terminated, self.epsilon, np.max(self.Q_w), np.min(self.Q_w))
-                print(f"epoch {i} episode reward: {ep_reward}, terminated: {terminated}, epsilon: {self.epsilon} max_q: {np.max(self.Q_w)}, min_q: {np.min(self.Q_w)}")
+                print(f"epoch {i} running reward: {running_reward}, ep_reward: {ep_reward} terminated: {terminated}, epsilon: {self.epsilon} max_q: {np.max(self.Q_w)}, min_q: {np.min(self.Q_w)}")
 
         
 
     # learn offline
     def learn_offline_policy(self, rollouts, offline_epochs, reward_fn = None, verbose=False):
-        print("learning offline")
 
         trajectory_tiles = []
         for trajectory in rollouts:
@@ -155,7 +167,7 @@ class QLearningAgent:
                 s_prime_tiles[t] = self.stc.tile_state(s_prime[t])
                 a_idx[t] = self.atc.idx_from_act(a[t])
                 if reward_fn != None:
-                    r[t] = reward_fn(s[t], a[t])
+                    r[t] = reward_fn(s[t], a[t], s_prime[t])
             
             trajectory_tiles.append((s_tiles, a_idx, r, s_prime_tiles, trajectory.terminated))
 
@@ -187,9 +199,9 @@ class QLearningAgent:
         #         for t in range(s.shape[0]):
         #             avg_reward += r[t]
         #             self.Q_update(s[t], a, r[t], s_prime[t], (t==s.shape[0]-1) and terminated)
-
+        if verbose:
+            print(f"average reward for offline learning {avg_reward}")
         
-        print("avg reward", avg_reward)
 
 
     def plot_qtable(self, sa_agg, save_path=None):
@@ -264,6 +276,7 @@ from policies import collect_rollouts
 if __name__ == "__main__":
     # env_name = "MountainCarContinuous-v0"
     # env = gym.make("MountainCarContinuous-v0", render_mode="rgb_array")
+    np.set_printoptions(precision=4)
 
     env_name = "MountainCarContinuous-v0"
     env_name = "Pendulum-v1"

@@ -105,7 +105,7 @@ class SA_Aggregator_Disc:
     def __init__(self, state_low, state_high, state_bins, num_actions):
         self.state_bins = state_bins
         self.agg_internal = Aggregator(state_low, state_high, state_bins)
-        self.num_actions = num_actions
+        self.n_actions = num_actions
 
     def sa_to_idx(self, states, actions):
         """
@@ -148,8 +148,12 @@ class SA_Aggregator_Disc:
             [self.agg_internal.idx_to_features(states), actions], axis=-1
         )
 
+
     def shape(self):
-        return self.state_bins + [self.num_actions]
+        return self.state_bins + [self.n_actions]
+
+    def num_a(self):
+        return self.n_actions
 
     def num_sa(self):
         return np.prod(self.shape())
@@ -159,6 +163,9 @@ class SA_Aggregator_Disc:
 
     def unflatten_sa_table(self, sa_table):
         return sa_table.reshape(self.shape(), order="F")
+
+    
+  
 
 
 class SA_Aggregator:
@@ -194,19 +201,23 @@ class SA_Aggregator:
     def num_sa(self):
         return np.prod(self.shape())
 
+    def num_a(self):
+        return np.prod(self.act_space)
+
     def flatten_sa_table(self, table):
         return self.agg_internal.flatten_s_table(table)
 
     def unflatten_sa_table(self, table):
         return self.agg_internal.unflatten_s_table(table)
 
+    
 
 class S_Reward:
     def __init__(self, agg, reward_table):
         self.agg = agg
         self.reward_table = reward_table
 
-    def __call__(self, state, action):
+    def __call__(self, state, action, next_state):
         return self.reward_table[tuple(self.agg.s_to_features(state))]
 
 
@@ -215,9 +226,53 @@ class SA_Reward:
         self.agg = agg
         self.reward_table = agg.flatten_sa_table(reward_table)
 
-    def __call__(self, state, action):
+    def __call__(self, state, action, next_state):
         rew = self.reward_table[self.agg.sa_to_idx(state, action)]
         return rew
+
+
+class SS_Reward:
+
+    def __init__(self, s_agg, reward_table):
+        self.agg = s_agg
+        self.reward_table = s_agg.flatten_s_table(reward_table)
+
+
+    def __call__(self, state, action, next_state):
+        cur = self.agg.s_to_idx(state)
+        next = self.agg.s_to_idx(next_state)
+        return self.state_table[next] - self.state_table[cur]
+
+
+
+
+
+
+class SAS_Reward:
+
+    def __init__(self, sa_agg, reward_table, reduce_fn = np.mean):
+        self.agg = sa_agg
+        self.reward_table = sa_agg.flatten_sa_table(reward_table)
+        self.reduce_fn = reduce_fn
+
+
+    def __call__(self, state, action, next_state):
+        cur = self.reward_table[self.agg.sa_to_idx(state, action)]
+        
+        next_state = np.repeat(next_state[None, :], self.agg.num_a(), axis=0)
+        next_actions = np.arange(self.agg.num_a())[:, None]
+        next = self.reward_table[self.agg.sa_to_idx(next_state, next_actions)]
+
+        
+        return self.reduce_fn(next) - cur
+
+
+
+
+
+
+
+
 
 
 def get_aggregator(env_name, bin_res=1):

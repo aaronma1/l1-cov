@@ -13,7 +13,7 @@ from policies import (
     collect_rollouts,
 )
 from qlearningpolicy import get_qlearning_agent
-from aggregation import get_aggregator, S_Reward, SA_Reward, unflatten_state
+from aggregation import get_aggregator, S_Reward, SA_Reward, SAS_Reward, SS_Reward
 
 from scipy.sparse.linalg import eigsh, eigs
 import gymnasium as gym
@@ -109,8 +109,7 @@ def collect_run_eigenoptions(base_args, option_args):
         top_eig = s_agg.unflatten_s_table(eigenvectors[:, 0])
         if np.dot(top_eig.flatten(), p_s.flatten()) > 0:
             top_eig = -top_eig
-        top_eig = reward_shaping(top_eig) 
-        reward = S_Reward(s_agg, top_eig)
+        reward = SS_Reward(s_agg, top_eig)
         # learn an option
         options.append(
             learn_policy(
@@ -124,7 +123,7 @@ def collect_run_eigenoptions(base_args, option_args):
     )
     return epoch_rollouts, options
 
-def collect_run_sa_eigenoptions(base_args, option_args):
+def collect_run_sa_eigenoptions(base_args, option_args, node_num=0):
     def eig_sparse(SR, k=131):
         SR = (SR + SR.T) / 2.0
         eigenvalues, eigenvectors = eigsh(SR, sigma=None, k=k, which="LM")
@@ -148,10 +147,15 @@ def collect_run_sa_eigenoptions(base_args, option_args):
 
         eigenvectors, eigenvalues = eig_sparse(SR, k=10)
         top_eig = sa_agg.unflatten_sa_table(eigenvectors[:, 0])
-
+        top_eig /= np.max(np.abs(top_eig))
         if np.dot(top_eig.flatten(), p_sa.flatten()) > 0:
             top_eig = -top_eig
-        reward = SA_Reward(sa_agg, top_eig)
+
+
+         
+        plotting.plot_heatmap(top_eig.reshape(12,-1), save_path=f"{i}_topeig" )
+        
+        reward = SAS_Reward(sa_agg, top_eig)
         # learn an option
         options.append(
             learn_policy(
@@ -181,7 +185,6 @@ def collect_run_codex(base_args, option_args):
         uniform_density_sa = np.ones(sa_agg.shape())
         l1_cov_reward = (
             reward_shaping(1 / (base_args["l1_eps"] * uniform_density_sa + p_sa))
-            + base_args["reward_shaping_constant"]
         )
 
         reward_fn = SA_Reward(sa_agg, l1_cov_reward)
@@ -282,6 +285,13 @@ def compute_l1_from_run(base_args, adv_args, run):
             reward_fn,
             **adv_args["learning_args"],
         )
+        adv_policy.learn_policy(
+            measure_env,
+            base_args["env_T"],
+            adv_args["online_epochs"],
+            reward_fn,
+            **adv_args["learning_args"],
+        )
 
         measure_reward_fn = SA_Reward(sa_agg, reward_shaping(l1_cov_reward))
         rollouts = collect_rollouts(
@@ -314,7 +324,7 @@ def compute_env_l1_cov(base_args, adv_args):
 
 
 
-
+import plotting
 if __name__ == "__main__":
     np.set_printoptions(precision=4)
     mountaincar_args = {
@@ -323,7 +333,7 @@ if __name__ == "__main__":
         "env_name": "MountainCarContinuous-v0",
         "env_T": 200,
         "num_rollouts": 400,
-        "num_epochs": 4,
+        "num_epochs": 10,
     }
     # base_args = {
     #     "gamma":0.999, # global discount factor
@@ -359,22 +369,27 @@ if __name__ == "__main__":
         "policy": "Qlearning",
         "gamma": 0.99,
         "lr": 0.01,
-        "online_epochs": 50000,
+        "online_epochs": 20000,
         "offline_epochs": 0,
         "learning_args": {
             "epsilon_start": 0.5,
             "epsilon_decay": 0.999,
             "decay_every": 3,
-            "verbose": False,
-            "print_every": 100,
+            "verbose": True,
+            "print_every": 1000,
         },
         "rollout_args": {
             "epsilon": 0.2,
         },
         "print_every": 100,
     }
-    trajectories, options = collect_run_sa_eigenoptions(mountaincar_args, Qlearning_args)
-    print(len(trajectories))
+    trajectories, options = collect_run_codex(mountaincar_args, Qlearning_args)
+    # print(len(trajectories))
+
+
+    for i in range(10):
+        s_agg, sa_agg = get_aggregator(mountaincar_args["env_name"])
+        plotting.plot_heatmap(p_sa_from_rollouts(trajectories[i]["all_rollouts"], sa_agg).reshape(12,-1), save_path=f"{i}psa.png")
 
     l1_covs = compute_l1_from_run(mountaincar_args, Qlearning_args_l1, trajectories)
     print("l1_covs", l1_covs)

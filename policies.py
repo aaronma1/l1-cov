@@ -282,7 +282,7 @@ def collect_rollouts(env, agent, T, num_rollouts, reward_fn = None, epsilon=0.0)
             action = agent.select_action(last_state, epsilon)
             state, reward, terminated, truncated, info = env.step(action)
             if reward_fn != None:
-                reward = reward_fn(state, action)
+                reward = reward_fn(last_state, action, state)
             trajectory.add_transition(last_state, action, reward, state, terminated)
             last_state = state
             if terminated or truncated:
@@ -348,10 +348,7 @@ def sr_from_rollouts(rollouts, s_agg, gamma=0.99, step_size = 0.01):
 
 
 
-import time
 def sa_sr_from_rollouts(rollouts, sa_agg, gamma=0.99, step_size=0.01):
-
-
     n = sa_agg.num_sa()
     sr = lil_matrix((n, n), dtype=np.float32)
 
@@ -392,23 +389,6 @@ def sa_sr_from_rollouts(rollouts, sa_agg, gamma=0.99, step_size=0.01):
             nz = curr.nonzero()[0]
             sr.rows[i] = nz.tolist()
             sr.data[i] = curr[nz].tolist()
-    return sr.tocsr() + 1e-9 * eye(n, format="csr")
-
-
-def sa_sr_from_rollouts_correct(rollouts, sa_agg, gamma=0.99, step_size = 0.01):
-    n = sa_agg.num_sa()
-    sr = lil_matrix((n,n), dtype=np.float32)
-    for trajectory in rollouts:
-        s, a, _, s_prime = trajectory.dump()
-        s_idx = sa_agg.sa_to_idx(s[:-1], a[:-1])
-        s_prime_idx = sa_agg.sa_to_idx(s_prime[:-1], a[1:])
-        assert np.array_equal(s_idx[1:], s_prime_idx[:-1])
-
-        for t in range(s_idx.shape[0]):
-            delta = gamma*sr[s_prime_idx[t], :].toarray().ravel() - sr[s_idx[t], :].toarray().ravel()
-            delta[s_idx[t]] += 1
-            sr[s_idx[t], :] += step_size * delta
-
     return sr.tocsr() + 1e-9 * eye(n, format="csr")
 
 

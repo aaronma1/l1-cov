@@ -40,7 +40,8 @@ def reward_shaping(reward_fn):
     r_min = np.min(reward_fn)
     new_reward = reward_fn
     new_reward -= r_min
-    new_reward /= r_max - r_min
+    if r_max != r_min:
+        new_reward /= r_max - r_min
     return new_reward
 
 
@@ -202,6 +203,12 @@ def collect_run_codex(base_args, option_args):
     return epoch_rollouts, options
 
 def collect_run_maxent(base_args, option_args):
+    def grad_ent():
+        pass
+
+
+
+
     s_agg, sa_agg = get_aggregator(base_args["env_name"], bin_res=1)
     env = gym.make(base_args["env_name"], render_mode="rgb_array")
 
@@ -259,20 +266,14 @@ def setup_env_exploring_starts(base_args):
     env = gym.make(base_args["env_name"], render_mode="rgb_array")
 
     class ESW(gym.Wrapper):
-        def __init__(self, env, state_sampler, random_first_act=True):
+        def __init__(self, env, state_sampler):
             self.state_sampler = state_sampler
-            self.random_first_action = random_first_act
             self.env = env
 
         def reset(self, **kwargs):
             state, info = env.reset(**kwargs)
             new_state = self.state_sampler()
             self.env.state = np.array(new_state, dtype=float)
-
-            if self.random_first_action:
-                first_action = self.env.action_space.sample()
-                state, reward, terminated, truncated, info = self.env.step(first_action)
-                return state, info
             return self.env.state, info
 
     def mountaincar_state_sampler():
@@ -357,52 +358,8 @@ def compute_l1_from_run(base_args, adv_args, run):
 
     return l1_covs, adv_policies
 
-def compute_env_l1_cov(base_args, adv_args):
-    measure_env, s_agg, sa_agg = setup_env(base_args)
-    learn_env = setup_env_exploring_starts(base_args)
-
-    adv_policy = setup_agent(base_args, adv_args)
-
-
-    uniform_density_sa = np.ones(sa_agg.shape())
-    p_sa =  np.ones(sa_agg.shape())/sa_agg.num_sa()
-    l1_cov_reward = 1 / (base_args["l1_eps"] * uniform_density_sa + p_sa)
-    reward_fn = SA_Reward(
-        sa_agg, reward_shaping(l1_cov_reward) 
-    )
-
-    policy = setup_agent(base_args, adv_args)
-    adv_policy.learn_policy(
-        learn_env,
-        base_args["env_T"],
-        adv_args["online_epochs"],
-        reward_fn,
-        **adv_args["learning_args"],
-    )
-    adv_policy.learn_policy(
-        measure_env,
-        base_args["env_T"],
-        adv_args["online_epochs"],
-        reward_fn,
-        **adv_args["learning_args"],
-    )
-    rollouts = collect_rollouts(
-        measure_env,
-        adv_policy,
-        base_args["env_T"],
-        base_args["num_rollouts"],
-        reward_fn,
-        **adv_args["rollout_args"],
-    )
-
-    return average_reward_from_rollouts(rollouts), adv_policy
-
-    
-
-
-
 def exp_test_mountaincar():
-    mountaincar_args = {
+    base_args = {
         "l1_eps": 1e-4,  # regularizer epsilon for
         "bin_res": 1,
         "env_name": "MountainCarContinuous-v0",
@@ -459,13 +416,18 @@ def exp_test_mountaincar():
         "print_every": 100,
     }
 
+
+    l1_mc = measure_env_l1(base_args, Qlearning_args_l1)
+    print("environment l1 cov {l1_mc}")
+
+    return
     
-    trajectories_codex, _ = collect_run_codex(mountaincar_args, Qlearning_args)
-    trajectories_eo, _ = collect_run_sa_eigenoptions(mountaincar_args, Qlearning_args)
+    trajectories_codex, _ = collect_run_codex(base_args, Qlearning_args)
+    trajectories_eo, _ = collect_run_sa_eigenoptions(base_args, Qlearning_args)
     
-    s_agg, sa_agg = get_aggregator(mountaincar_args["env_name"])
+    s_agg, sa_agg = get_aggregator(base_args["env_name"])
     import plotting
-    for i in range(mountaincar_args["num_epochs"]):
+    for i in range(base_args["num_epochs"]):
         plotting.plot_heatmap(p_sa_from_rollouts(trajectories_codex[i]["all_rollouts"], sa_agg).reshape(12, -1), save_path=f"out/figs/{i}_psa_cov.png")
         plotting.plot_heatmap(p_sa_from_rollouts(trajectories_eo[i]["all_rollouts"], sa_agg).reshape(12, -1),save_path=f"out/figs/{i}_psa_eo.png")
 

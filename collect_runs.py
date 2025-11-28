@@ -435,7 +435,7 @@ def exp_test_mountaincar():
             "print_every": 100,
         },
         "rollout_args": {
-            "epsilon": 0.2,
+            "epsilon": 0.0,
         },
     }
     # more comprehensive qlearning args for l1 coverage
@@ -454,7 +454,7 @@ def exp_test_mountaincar():
             "print_every": 1000,
         },
         "rollout_args": {
-            "epsilon": 0.2,
+            "epsilon": 0.0,
         },
         "print_every": 100,
     }
@@ -466,8 +466,8 @@ def exp_test_mountaincar():
     s_agg, sa_agg = get_aggregator(mountaincar_args["env_name"])
     import plotting
     for i in range(mountaincar_args["num_epochs"]):
-        plotting.plot_heatmap(p_sa_from_rollouts(trajectories_codex[i]["all_rollouts"], sa_agg).reshape(12, -1), save_path=f"{i}_psa_cov.png")
-        plotting.plot_heatmap(p_sa_from_rollouts(trajectories_eo[i]["all_rollouts"], sa_agg).reshape(12, -1),save_path=f"{i}_psa_eo.png")
+        plotting.plot_heatmap(p_sa_from_rollouts(trajectories_codex[i]["all_rollouts"], sa_agg).reshape(12, -1), save_path=f"out/figs/{i}_psa_cov.png")
+        plotting.plot_heatmap(p_sa_from_rollouts(trajectories_eo[i]["all_rollouts"], sa_agg).reshape(12, -1),save_path=f"out/figs/{i}_psa_eo.png")
 
 
 

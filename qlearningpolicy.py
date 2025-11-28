@@ -1,9 +1,9 @@
 import numpy as np
 from plotting import plot_heatmap
 from numba import jit, njit
-import lib.tiles3 as tc
+import tiles3 as tc
 
-from lib.policies import MTCCActionCoder, PendulumActionCoder, DiscreteActionCoder
+from policies import MTCCActionCoder, PendulumActionCoder, DiscreteActionCoder
 
 # Q-learning agent
 class TileCoder:
@@ -51,6 +51,10 @@ class TileCoder:
     def num_tilings(self):
         return self.n_tilings
 
+
+
+
+
 class QLearningAgent:
 
     def __init__(self, tilecoder, action_coder, gamma, lr):
@@ -69,6 +73,8 @@ class QLearningAgent:
 
     def select_action(self, state, epsilon=0.0):
        return self._select_action(self.stc.tile_state(state), epsilon)
+
+
 
     def _select_action(self, state_features, epsilon=0.0):
         if np.random.rand() < epsilon:
@@ -123,9 +129,12 @@ class QLearningAgent:
                      verbose=True, print_every=200, epsilon_decay=0.999, decay_every=1, epsilon_start = 1.0
                      ):
         self.epsilon = epsilon_start
+
+
         running_reward = 0
         for i in range(episodes):
             ep_reward, terminated = self.learn_policy_internal(env, T, reward_fn)
+
 
             if i == 0:
                 running_reward = ep_reward
@@ -162,6 +171,7 @@ class QLearningAgent:
             
             trajectory_tiles.append((s_tiles, a_idx, r, s_prime_tiles, trajectory.terminated))
 
+
         @njit
         def _internal(Q, trajectory_tiles, offline_epochs, lr, gamma):
             avg_reward = 0
@@ -193,7 +203,9 @@ class QLearningAgent:
             print(f"average reward for offline learning {avg_reward}")
         
 
+
     def plot_qtable(self, sa_agg, save_path=None):
+
         state_low = [-1.2, -0.07]
         state_high = [0.6, 0.07]
 
@@ -260,11 +272,10 @@ def get_qlearning_agent(env_name, gamma, lr):
 
 import itertools
 import gymnasium as gym
-from lib.policies import collect_rollouts
+from policies import collect_rollouts
 if __name__ == "__main__":
     # env_name = "MountainCarContinuous-v0"
     # env = gym.make("MountainCarContinuous-v0", render_mode="rgb_array")
-    np.set_printoptions(precision=4)
 
     env_name = "MountainCarContinuous-v0"
     env_name = "Pendulum-v1"

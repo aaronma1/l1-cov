@@ -32,8 +32,6 @@ class MTCCActionCoder:
     def enumerate_actions(self):
         return [0,1,2]
 
-
-
 class PendulumActionCoder:
     def __init__(self, num_bins=5, action_low=-2.0, action_high=2.0):
         """
@@ -94,8 +92,6 @@ class DiscreteActionCoder:
 
     def enumerate_actions(self):
         return list(range(self.num_bins)) 
-
-
 
 class RandomAgent:
     def __init__(self, atc):
@@ -249,9 +245,6 @@ class TrajectoryContainer:
 
         self.current_idx += other.current_idx
 
-
-
-
     # ----------------------
     # Iterators
     # ----------------------
@@ -346,8 +339,6 @@ def sr_from_rollouts(rollouts, s_agg, gamma=0.99, step_size = 0.01):
             sr[s_idx[t], :] += step_size * delta
     return sr.tocsr() + 1e-9 * eye(n, format="csr")
 
-
-
 def sa_sr_from_rollouts(rollouts, sa_agg, gamma=0.99, step_size=0.01):
     n = sa_agg.num_sa()
     sr = lil_matrix((n, n), dtype=np.float32)
@@ -402,8 +393,6 @@ def average_reward_from_rollouts(rollouts, reward_fn = None):
             for t in range(s.shape[0]):
                 avg_reward += reward_fn(s[t],a[t])
     return avg_reward/len(rollouts)
-
-
 
 import itertools
 import gymnasium as gym

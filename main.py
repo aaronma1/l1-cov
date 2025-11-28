@@ -164,7 +164,7 @@ def experiments_mountaincar(SAVE_DIR, MAX_WORKERS, N_RUNS, epochs=15):
         "gamma":0.999,
         "lr":0.01,
         "online_epochs":200,
-        "offline_epochs":1000,
+        "offline_epochs":10,
 
 
         "learning_args": {

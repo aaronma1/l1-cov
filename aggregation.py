@@ -243,11 +243,6 @@ class SS_Reward:
         next = self.agg.s_to_idx(next_state)
         return self.state_table[next] - self.state_table[cur]
 
-
-
-
-
-
 class SAS_Reward:
 
     def __init__(self, sa_agg, reward_table, reduce_fn = np.mean):
@@ -262,18 +257,7 @@ class SAS_Reward:
         next_state = np.repeat(next_state[None, :], self.agg.num_a(), axis=0)
         next_actions = np.arange(self.agg.num_a())[:, None]
         next = self.reward_table[self.agg.sa_to_idx(next_state, next_actions)]
-
-        
         return self.reduce_fn(next) - cur
-
-
-
-
-
-
-
-
-
 
 def get_aggregator(env_name, bin_res=1):
     if env_name == "MountainCarContinuous-v0":

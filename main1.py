@@ -42,50 +42,58 @@ def read_pickle(save_name):
 # Experiment Runners
 ######################################
 
+
 def run_experiment_eigenoptions(base_args, option_args, save_dir, n_runs, max_workers=16):
-    n_files = math.ceil(n_runs/max_workers)
-    for i in range(n_files):
-        filepath = os.path.join(save_dir, f"part{i}_runs.pkl")
-        if not os.path.exists(filepath):
-            _run_experiment_eigenoptions(base_args, option_args, filepath, max_workers,)
-
-def _run_experiment_eigenoptions(base_args, option_args, save_path, max_workers):
-    runs = []
-    options = []
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = [
-            executor.submit(collect_run_sa_eigenoptions, base_args=base_args, option_args=option_args)
-            for i in range(max_workers)
+            executor.submit(
+                _run_experiment_eigenoptions, 
+                base_args=base_args, 
+                option_args=option_args, 
+                save_dir= save_dir,
+                run_id = i
+            )
+            for i in range(n_runs)
         ]
 
-        for i,f in enumerate(as_completed(futures)):
-            transitions, options = f.result()
-            runs.append(transitions)
+        for i, f in enumerate(as_completed(futures)):
             print(f"done run {i}")
-
-    dump_pickle(runs, save_path)
-
-def run_experiment_codex(base_args, option_args, save_dir, n_runs, max_workers):
-    n_files = math.ceil(n_runs/max_workers)
-    for i in range(n_files):
-        filepath = os.path.join(save_dir, f"part{i}_runs.pkl")
-        if not os.path.exists(filepath):
-            _run_experiment_codex(base_args, option_args, filepath, max_workers)
+            del f
 
 
-def _run_experiment_codex(base_args, option_args, save_path, max_workers=16):
-    #load checkpoint
-    runs = []
+
+
+
+def _run_experiment_eigenoptions(base_args, option_args, save_dir, run_id):
+    transitions, options = collect_run_sa_eigenoptions(base_args, option_args)
+    save_path_transitions = os.path.join("part{i}_run.pkl")
+    save_path_options = os.path.join("part{i}_run.pkl")
+    dump_pickle(transitions, save_path_options)
+    dump_pickle(options, save_path_options)
+
+def run_experiment_codex(base_args, option_args, save_dir, n_runs, max_workers=16):
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = [
-            executor.submit(collect_run_codex, base_args=base_args, option_args=option_args)
-            for i in range(max_workers)
+            executor.submit(
+                _run_experiment_eigenoptions, 
+                base_args=base_args, 
+                option_args=option_args, 
+                save_dir= save_dir,
+                run_id = i
+            )
+            for i in range(n_runs)
         ]
-        for i,f in enumerate(as_completed(futures)):
-            transitions, options = f.result()
-            runs.append(transitions)
-            print(f"done run {i}, {len(runs)}")
-    dump_pickle(runs, save_path)
+
+        for i, f in enumerate(as_completed(futures)):
+            print(f"done run {i}")
+            del f
+
+def _run_experiment_codex(base_args, option_args, save_dir, run_id):
+    transitions, options = collect_run_sa_eigenoptions(base_args, option_args)
+    save_path_transitions = os.path.join("part{i}_run.pkl")
+    save_path_options = os.path.join("part{i}_run.pkl")
+    dump_pickle(transitions, save_path_options)
+    dump_pickle(options, save_path_options)
 
 
 ######################################
@@ -100,16 +108,13 @@ def list_pickle_runs(directory):
     )
 
 def compute_l1_from_experiment(base_args, adv_args, exp_dump_path, max_workers=16):
-    print(f"Computing l1 coverage for runs in {exp_dump_path}")
     pickles = list_pickle_runs(exp_dump_path)
-    print(pickles)
     all_l1_covs = []
     save_path = os.path.join(exp_dump_path, "all_l1_covs.pkl")
 
     for fpath in pickles:
         print(fpath)
         runs = read_pickle(fpath)
-        print(len(runs))
         with ProcessPoolExecutor(max_workers=max_workers) as executor:
             futures = [
                 executor.submit(compute_l1_from_run, base_args=base_args, adv_args=adv_args, run=runs[i])
@@ -121,20 +126,6 @@ def compute_l1_from_experiment(base_args, adv_args, exp_dump_path, max_workers=1
                 all_l1_covs.append(l1)
 
     dump_pickle(all_l1_covs, save_path)
-
-
-
-######################################
-# Compute stuff from runs
-#######################V##############
-def analysis(save_dir, base_args):
-    
-
-    runs = list_pickle_runs(save_dir)
-    pass
-
-
-
 
 
 ######################################

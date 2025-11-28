@@ -15,8 +15,8 @@ import copy
 
 import gc
 
-from policies import collect_rollouts
-from qlearningpolicy import MTCCActionCoder, PendulumActionCoder
+from lib.policies import collect_rollouts
+from lib.qlearningpolicy import MTCCActionCoder, PendulumActionCoder
 
 
 class ReinforcePolicy(nn.Module):
@@ -152,7 +152,7 @@ class ReinforcePolicy(nn.Module):
 
 
 
-from policies import collect_rollouts
+from lib.policies import collect_rollouts
 
 
 if __name__ == "__main__":

@@ -1,9 +1,9 @@
 import numpy as np
 from plotting import plot_heatmap
 from numba import jit, njit
-import tiles3 as tc
+import lib.tiles3 as tc
 
-from policies import MTCCActionCoder, PendulumActionCoder, DiscreteActionCoder
+from lib.policies import MTCCActionCoder, PendulumActionCoder, DiscreteActionCoder
 
 # Q-learning agent
 class TileCoder:
@@ -272,7 +272,7 @@ def get_qlearning_agent(env_name, gamma, lr):
 
 import itertools
 import gymnasium as gym
-from policies import collect_rollouts
+from lib.policies import collect_rollouts
 if __name__ == "__main__":
     # env_name = "MountainCarContinuous-v0"
     # env = gym.make("MountainCarContinuous-v0", render_mode="rgb_array")

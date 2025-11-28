@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from policies import p_s_from_rollouts, p_sa_from_rollouts, sr_from_rollouts
-from aggregation import get_aggregator
+from lib.policies import p_s_from_rollouts, p_sa_from_rollouts, sr_from_rollouts
+from lib.aggregation import get_aggregator
 
 from scipy.stats import entropy
 

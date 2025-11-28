@@ -3,7 +3,7 @@ from dataclasses import dataclass
 from tkinter import W
 
 import gymnasium as gym
-from policies import (
+from lib.policies import (
     average_reward_from_rollouts,
     get_random_agent,
     sr_from_rollouts,
@@ -12,8 +12,8 @@ from policies import (
     sa_sr_from_rollouts,
     collect_rollouts,
 )
-from qlearningpolicy import get_qlearning_agent
-from aggregation import get_aggregator, S_Reward, SA_Reward, SAS_Reward, SS_Reward
+from lib.qlearningpolicy import get_qlearning_agent
+from lib.aggregation import get_aggregator, S_Reward, SA_Reward, SAS_Reward, SS_Reward
 
 from scipy.sparse.linalg import eigsh, eigs
 import gymnasium as gym
@@ -463,11 +463,11 @@ def exp_test_mountaincar():
     trajectories_codex, _ = collect_run_codex(mountaincar_args, Qlearning_args)
     trajectories_eo, _ = collect_run_sa_eigenoptions(mountaincar_args, Qlearning_args)
     
-    sa_agg = get_aggregator(mountaincar_args["env_name"])
+    s_agg, sa_agg = get_aggregator(mountaincar_args["env_name"])
     import plotting
     for i in range(mountaincar_args["num_epochs"]):
-        plotting.plot_heatmap(p_sa_from_rollouts(trajectories_codex[i]["all_rollouts"]).reshape(12, -1), save_path=f"{i}_psa_cov.png")
-        plotting.plot_heatmap(p_sa_from_rollouts(trajectories_eo[i]["all_rollouts"]).reshape(12, -1),save_path=f"{i}_psa_eo.png")
+        plotting.plot_heatmap(p_sa_from_rollouts(trajectories_codex[i]["all_rollouts"], sa_agg).reshape(12, -1), save_path=f"{i}_psa_cov.png")
+        plotting.plot_heatmap(p_sa_from_rollouts(trajectories_eo[i]["all_rollouts"], sa_agg).reshape(12, -1),save_path=f"{i}_psa_eo.png")
 
 
 

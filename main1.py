@@ -70,7 +70,7 @@ def run_experiment_eigenoptions(base_args, option_args, save_dir, n_runs, max_wo
             del f
 
 
-def _run_experiment_codex(base_args, option_args, save_dir, run_id):
+def _run_experiment_codex(base_args, option_args, save_dir, run_id, save_fn):
     transitions, options = collect_run_codex(base_args, option_args)
     save_path_transitions = os.path.join(save_dir, f"part{run_id}_run.pkl")
     save_path_options = os.path.join(save_dir, f"part{run_id}_options.pkl")

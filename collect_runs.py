@@ -139,6 +139,7 @@ def collect_run_sa_eigenoptions(base_args, option_args, node_num=0):
     epoch_rollouts = []
 
     for i in range(base_args["num_epochs"]):
+        print(f"epoch {i}")
         epoch_rollouts.append(
             collect_rollouts_from_options(env, base_args, option_args, options)
         )
@@ -199,6 +200,41 @@ def collect_run_codex(base_args, option_args):
         collect_rollouts_from_options(env, base_args, option_args, options)
     )
     return epoch_rollouts, options
+
+def collect_run_maxent(base_args, option_args):
+    s_agg, sa_agg = get_aggregator(base_args["env_name"], bin_res=1)
+    env = gym.make(base_args["env_name"], render_mode="rgb_array")
+
+    options = [get_random_agent(base_args["env_name"])]
+    epoch_rollouts = []
+    for i in range(base_args["num_epochs"]):
+        epoch_rollouts.append(
+            collect_rollouts_from_options(env, base_args, option_args, options)
+        )
+        
+        p_sa = p_sa_from_rollouts(epoch_rollouts[-1]["all_rollouts"], sa_agg)
+        uniform_density_sa = np.ones(sa_agg.shape())
+        l1_cov_reward = (
+            reward_shaping(1 / (base_args["l1_eps"] * uniform_density_sa + p_sa))
+        )
+
+        reward_fn = SA_Reward(sa_agg, l1_cov_reward)
+        # learn policy
+        options.append(
+            learn_policy(
+                env,
+                base_args,
+                option_args,
+                reward_fn,
+                epoch_rollouts[-1]["all_rollouts"],
+            )
+        )
+
+    epoch_rollouts.append(
+        collect_rollouts_from_options(env, base_args, option_args, options)
+    )
+    return epoch_rollouts, options
+
 
 
 def collect_run_random(base_args):
@@ -395,7 +431,7 @@ def exp_test_mountaincar():
             "epsilon_start": 1,
             "epsilon_decay": 0.999,
             "decay_every": 5,
-            "verbose": False,
+            "verbose": True,
             "print_every": 100,
         },
         "rollout_args": {
@@ -414,7 +450,7 @@ def exp_test_mountaincar():
             "epsilon_start": 0.5,
             "epsilon_decay": 0.999,
             "decay_every": 3,
-            "verbose": False,
+            "verbose": True,
             "print_every": 1000,
         },
         "rollout_args": {
@@ -422,14 +458,25 @@ def exp_test_mountaincar():
         },
         "print_every": 100,
     }
+
+    
     trajectories_codex, _ = collect_run_codex(mountaincar_args, Qlearning_args)
-    trajectories_eo, _ = collect_run_eigenoptions(mountaincar_args, Qlearning_args)
-    # print(len(trajectories))
+    trajectories_eo, _ = collect_run_sa_eigenoptions(mountaincar_args, Qlearning_args)
+    
+    sa_agg = get_aggregator(mountaincar_args["env_name"])
+    import plotting
+    for i in range(mountaincar_args["num_epochs"]):
+        plotting.plot_heatmap(p_sa_from_rollouts(trajectories_codex[i]["all_rollouts"]).reshape(12, -1), save_path=f"{i}_psa_cov.png")
+        plotting.plot_heatmap(p_sa_from_rollouts(trajectories_eo[i]["all_rollouts"]).reshape(12, -1),save_path=f"{i}_psa_eo.png")
+
+
+
 
     codex_l1_covs, _ = compute_l1_from_run(mountaincar_args, Qlearning_args_l1, trajectories_codex)
     eo_l1_covs, _ = compute_l1_from_run(mountaincar_args, Qlearning_args_l1, trajectories_eo)
     print("codex l1 covs", codex_l1_covs)
     print("EO l1 covs", eo_l1_covs)
+
 
 
 if __name__ == "__main__":

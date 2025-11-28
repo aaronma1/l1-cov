@@ -241,7 +241,7 @@ class SS_Reward:
     def __call__(self, state, action, next_state):
         cur = self.agg.s_to_idx(state)
         next = self.agg.s_to_idx(next_state)
-        return self.state_table[next] - self.state_table[cur]
+        return self.reward_table[next] - self.reward_table[cur]
 
 class SAS_Reward:
 

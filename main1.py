@@ -17,7 +17,6 @@ import argparse
 ######################################
 
 def dump_pickle(obj, save_path):
-    print(f"dumping to {save_path}")
     """Atomic write — safe against parallel saves or crashes"""
     dirpath = os.path.dirname(save_path)
     fd, tmppath = tempfile.mkstemp(dir=dirpath)
@@ -45,12 +44,15 @@ def read_pickle(save_name):
 
 
 def _run_experiment_eigenoptions(base_args, option_args, save_dir, run_id, save_fn):
-    transitions, options = collect_run_sa_eigenoptions(base_args, option_args)
     save_path_transitions = os.path.join(save_dir, f"part{run_id}_run.pkl")
     save_path_options = os.path.join(save_dir, f"part{run_id}_options.pkl")
+    if os.path.exists(save_path_options) and os.path.exists(save_path_transitions):
+        return
+    transitions, options = collect_run_sa_eigenoptions(base_args, option_args)
     save_fn(transitions, save_path_transitions)
     save_fn(options, save_path_options)
 def run_experiment_eigenoptions(base_args, option_args, save_dir, n_runs, max_workers=16):
+
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = [
             executor.submit(
@@ -63,7 +65,6 @@ def run_experiment_eigenoptions(base_args, option_args, save_dir, n_runs, max_wo
             )
             for i in range(n_runs)
         ]
-        print(len(futures))
 
         for i, f in enumerate(as_completed(futures)):
             print(f"done run {i}")
@@ -71,9 +72,11 @@ def run_experiment_eigenoptions(base_args, option_args, save_dir, n_runs, max_wo
 
 
 def _run_experiment_codex(base_args, option_args, save_dir, run_id, save_fn):
-    transitions, options = collect_run_codex(base_args, option_args)
     save_path_transitions = os.path.join(save_dir, f"part{run_id}_run.pkl")
     save_path_options = os.path.join(save_dir, f"part{run_id}_options.pkl")
+    if os.path.exists(save_path_options) and os.path.exists(save_path_transitions):
+        return
+    transitions, options = collect_run_codex(base_args, option_args)
     save_fn(transitions, save_path_transitions)
     save_fn(options, save_path_options)
 
@@ -108,23 +111,28 @@ def list_pickle_runs(directory):
         if f.endswith("_run.pkl")
     )
 
+def _compute_l1_from_experiment(base_args, adv_args, fpath, read_fn=read_pickle):
+    run = read_fn(fpath)
+    l1_covs, adv_policy = compute_l1_from_run(base_args, adv_args, run)
+    return l1_covs
+
+
+
 def compute_l1_from_experiment(base_args, adv_args, exp_dump_path, max_workers=16):
     pickles = list_pickle_runs(exp_dump_path)
     all_l1_covs = []
     save_path = os.path.join(exp_dump_path, "all_l1_covs.pkl")
 
-    for fpath in pickles:
-        print(fpath)
-        runs = read_pickle(fpath)
-        with ProcessPoolExecutor(max_workers=max_workers) as executor:
-            futures = [
-                executor.submit(compute_l1_from_run, base_args=base_args, adv_args=adv_args, run=runs[i])
-                for i in range(len(runs))
-            ]
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = [
+            executor.submit(_compute_l1_from_experiment, base_args=base_args, adv_args=adv_args, fpath=fpath)
+            for fpath in pickles
+        ]
 
-            for _,f in enumerate(as_completed(futures)):
-                l1 = f.result()
-                all_l1_covs.append(l1)
+        for _,f in enumerate(as_completed(futures)):
+            l1 = f.result()
+            all_l1_covs.append(l1)
+            del f
 
     dump_pickle(all_l1_covs, save_path)
 
@@ -146,10 +154,10 @@ def experiments_mountaincar(SAVE_DIR, MAX_WORKERS, N_RUNS, epochs=15):
 
     Qlearning_args_eigenoptions = {
         "policy": "Qlearning",
-        "gamma":0.999,
+        "gamma":0.99,
         "lr":0.01,
-        "online_epochs":200,
-        "offline_epochs":1000,
+        "online_epochs":1000,
+        "offline_epochs":10,
 
 
         "learning_args": {
@@ -167,9 +175,9 @@ def experiments_mountaincar(SAVE_DIR, MAX_WORKERS, N_RUNS, epochs=15):
     Qlearning_args_adversery = {
     # base_args = {
         "policy": "Qlearning",
-        "gamma":0.999,
+        "gamma":0.99,
         "lr":0.01,
-        "online_epochs":10000,
+        "online_epochs":5000,
         "offline_epochs":0,
 
         "learning_args": {
@@ -192,10 +200,6 @@ def experiments_mountaincar(SAVE_DIR, MAX_WORKERS, N_RUNS, epochs=15):
         "l1_cov_args": (base_args, Qlearning_args_adversery),
     }
     dump_pickle(params, os.path.join(SAVE_DIR, "params.pkl"))
-
-    print(N_RUNS)
-
-
 
     print("#### collecting eigenoptions rollouts ####")
     run_experiment_eigenoptions(base_args, Qlearning_args_eigenoptions, save_dir=save_dir_eigenoptions, max_workers=MAX_WORKERS, n_runs=N_RUNS)
@@ -255,4 +259,5 @@ def parse_args():
 if __name__ == "__main__":
 
     args = parse_args()
+    multiprocessing.set_start_method("spawn", force=True) 
     experiments_mountaincar(SAVE_DIR=args.save_path, N_RUNS=args.n_runs,MAX_WORKERS=args.max_workers, epochs=args.epochs)

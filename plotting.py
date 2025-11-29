@@ -104,6 +104,27 @@ def gen_heatmap_epoch(rollouts, base_args, save_dir="out"):
 
 
 
+def plot_sa_heatmap_pendulum(sa_heatmap, sa_agg, save_path=None):
+    state_shape = sa_agg.state_shape()
+    bins_theta = sa_agg.state_shape()[0] + sa_agg.state_shape()[1]
+    theta_samples = np.linspace(0, 2*np.pi, num=bins_theta)
+    v_samples = np.linspace(-8, 8, num = 2*state_shape[3])
+
+    heatmap = np.zeros((bins_theta, 2*state_shape[3], sa_agg.num_a()))
+
+
+    for i, theta in enumerate(theta_samples):
+        for j, v in enumerate(v_samples):
+            state = [np.cos(theta), np.sin(theta), v]
+
+            for a in sa_agg.num_a():
+                heatmap[i][j][a] = sa_heatmap[sa_agg.sa_to_features(state,a)]
+    
+    plot_heatmap(heatmap.reshape(bins_theta, -1), save_path=save_path)
+
+        
+        
+
 
 
 

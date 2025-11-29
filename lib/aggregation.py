@@ -209,6 +209,9 @@ class SA_Aggregator:
 
     def unflatten_sa_table(self, table):
         return self.agg_internal.unflatten_s_table(table)
+    
+    def state_shape(self):
+        return self.state_space
 
     
 
@@ -288,9 +291,11 @@ def get_aggregator(env_name, bin_res=1):
         a_low = [-2.0]
         a_high= [2.0]
         s_bins = [8,8, 16]
-        a_bins = [5]
+        act_bins = [3]
+        act_high = [2.0]
+        act_low = [-2.0]
         return Aggregator(s_low, s_high, s_bins), SA_Aggregator(
-            s_low, s_high, s_bins, num_actions
+            s_low, s_high, s_bins, act_high, act_low, act_bins
         )
 
     if env_name == "AcroBot-v1":

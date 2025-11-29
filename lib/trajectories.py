@@ -1,127 +1,5 @@
-from lib.aggregation import get_aggregator
 import numpy as np
 from scipy.sparse import lil_matrix, eye
-
-
-class MTCCActionCoder:
-    
-    def num_actions(self):
-        return 3
-
-    def feature_shape(self):
-        return [3]
-    
-    def idx_from_act(self, action):
-        if action[0] < -0.333:
-            return 0
-        if action[0] > 0.333:
-            return 2
-        return 1
-
-    def idx_to_act(self, idx):
-        if idx == 0:
-            return [-1]
-        if idx == 1:
-            return [0]
-        return [1]
-    
-    def enumerate_actions(self):
-        return [0,1,2]
-
-class PendulumActionCoder:
-    def __init__(self, num_bins=5, action_low=-2.0, action_high=2.0):
-        """
-        Discretizes Pendulum actions into `num_bins` evenly spaced torques.
-
-        Args:
-            num_bins (int): number of discrete actions
-            action_low (float): min torque
-            action_high (float): max torque
-        """
-        self.num_bins = num_bins
-        self.action_low = action_low
-        self.action_high = action_high
-
-        # Create evenly spaced discrete actions
-        self.actions = np.linspace(action_low, action_high, num_bins)
-
-    def num_actions(self):
-        return self.num_bins
-
-    def feature_shape(self):
-        return [self.num_bins]
-
-    def idx_from_act(self, action):
-        """
-        Map a continuous action to discrete index.
-        """
-        action = np.clip(action, self.action_low, self.action_high)
-        idx = np.argmin(np.abs(self.actions - action))
-        return idx
-
-    def idx_to_act(self, idx):
-        """
-        Map discrete index back to continuous action.
-        """
-        return [self.actions[idx]]
-
-    def enumerate_actions(self):
-        """
-        Return all discrete action indices.
-        """
-        return list(range(self.num_bins))
-
-
-class DiscreteActionCoder:
-    def __init__(self, num_bins=2):
-        self.num_bins = num_bins
-        pass
-
-    def idx_from_act(self, action):
-        return action
-    
-    def idx_to_act(self, idx):
-        return idx
-    
-    def feature_shape(self):
-        return [self.num_bins]
-
-    def enumerate_actions(self):
-        return list(range(self.num_bins)) 
-
-class RandomAgent:
-    def __init__(self, atc):
-        self.idx = np.arange(len(atc))
-        self.atc = atc
-
-    def select_action(self, state, epsilon=0.0):
-        return self.atc[np.random.choice(self.idx)]
-
-
-# TODO change random agent to use action coders
-def get_random_agent(env_name):
-    if env_name == "MountainCarContinuous-v0":
-        return RandomAgent(np.array([np.array([-1.0]), np.array([0.0]), np.array([1.0])]))
-
-    if env_name == "CartPole-v1":
-        return RandomAgent(np.array([0,1]))
-
-    if env_name == "Pendulum-v1":
-        return RandomAgent(
-            np.array([
-                np.array([-2.0]),
-                np.array([-1.3]),
-                np.array([-0.66]),
-                np.array([-0.0]),
-                np.array([0.66]),
-                np.array([1.3]),
-                np.array([2.0]),
-            ])
-        )
-    
-    assert False, f"Unknown env name {env_name}"
-
-
 
 class Trajectory:
     def __init__(self, T):
@@ -286,28 +164,6 @@ class TrajectoryContainer:
         self._iter_idx += 1
         return traj
 
-
-def collect_rollouts(env, agent, T, num_rollouts, reward_fn = None, epsilon=0.0):
-    def _collect_rollout(env, agent, T, reward_fn, epsilon):
-        trajectory = Trajectory(T)
-        last_state, _ = env.reset()
-        for i in range(T):
-            action = agent.select_action(last_state, epsilon)
-            state, reward, terminated, truncated, info = env.step(action)
-            if reward_fn != None:
-                reward = reward_fn(last_state, action, state)
-            trajectory.add_transition(last_state, action, reward, state, terminated)
-            last_state = state
-            if terminated or truncated:
-                return trajectory
-        return trajectory
-    rollouts = TrajectoryContainer(T, init_capacity=num_rollouts)
-
-    for i in range(num_rollouts):
-        rollouts.add_trajectory(_collect_rollout(env, agent, T, reward_fn, epsilon))
-    return rollouts
-
-
 def p_s_from_rollouts(rollouts, s_agg):
     p = np.zeros(s_agg.shape())
     for trajectory in rollouts:
@@ -394,7 +250,6 @@ def sa_sr_from_rollouts(rollouts, sa_agg, gamma=0.99, step_size=0.01):
             sr.data[i] = curr[nz].tolist()
     return sr.tocsr() + 1e-9 * eye(n, format="csr")
 
-
 def average_reward_from_rollouts(rollouts, reward_fn = None):
     avg_reward = 0
     for trajectory in rollouts:
@@ -406,28 +261,22 @@ def average_reward_from_rollouts(rollouts, reward_fn = None):
                 avg_reward += reward_fn(s[t],a[t])
     return avg_reward/len(rollouts)
 
-import itertools
-import gymnasium as gym
-if __name__ == "__main__":
+def collect_rollouts(env, agent, T, num_rollouts, reward_fn = None, epsilon=0.0):
+    def _collect_rollout(env, agent, T, reward_fn, epsilon):
+        trajectory = Trajectory(T)
+        last_state, _ = env.reset()
+        for i in range(T):
+            action = agent.select_action(last_state, epsilon)
+            state, reward, terminated, truncated, info = env.step(action)
+            if reward_fn != None:
+                reward = reward_fn(last_state, action, state)
+            trajectory.add_transition(last_state, action, reward, state, terminated)
+            last_state = state
+            if terminated or truncated:
+                return trajectory
+        return trajectory
+    rollouts = TrajectoryContainer(T, init_capacity=num_rollouts)
 
-    # env_name = "CartPole-v1"
-    env_name = "MountainCarContinuous-v0"
-    # env = gym.make("MountainCarContinuous-v0", render_mode="rgb_array")
-    env = gym.make(env_name, render_mode="rgb_array") 
-    agent = get_random_agent(env_name)
-
-    s_agg, sa_agg = get_aggregator(env_name, bin_res=1)
-    rollouts = collect_rollouts(env, agent, 1000, 100)
-
-    p = p_s_from_rollouts(rollouts, s_agg)
-    p_sa = p_sa_from_rollouts(rollouts, sa_agg)
-    sr = sr_from_rollouts(rollouts, s_agg)
-
-    p1 = s_agg.flatten_state_table(p)
-    p2 = s_agg.shape()
-
-
-
-
-
-
+    for i in range(num_rollouts):
+        rollouts.add_trajectory(_collect_rollout(env, agent, T, reward_fn, epsilon))
+    return rollouts

@@ -232,7 +232,6 @@ class QLearningAgent:
 
 
 def get_qlearning_agent(env_name, gamma, lr):
-    
     if env_name == "MountainCarContinuous-v0":
         mctc = TileCoder([-1.2, -0.07],[0.6, 0.07], num_tilings=16, num_tiles=8)
         mcac = MTCCActionCoder()
@@ -255,6 +254,7 @@ def get_qlearning_agent(env_name, gamma, lr):
         acac = DiscreteActionCoder(3)
         return QLearningAgent(actc, acac, gamma=gamma, lr=lr)
 
+    assert False, f"unknown env name {env_name}"
 
 
 

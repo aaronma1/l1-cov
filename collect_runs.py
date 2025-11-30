@@ -10,6 +10,7 @@ from lib.trajectories import (
     collect_rollouts,
 )
 from lib.qlearningpolicy import get_qlearning_agent
+from lib.reinforce import get_reinforce_agent
 from lib.aggregation import get_aggregator, S_Reward, SA_Reward, SAS_Reward, SS_Reward
 
 from scipy.sparse.linalg import eigsh
@@ -61,6 +62,10 @@ def setup_agent(base_args, agent_args):
     #     pass
     if agent_args["policy"] == "Qlearning":
         return get_qlearning_agent(
+            base_args["env_name"], agent_args["gamma"], agent_args["lr"]
+        )
+    if agent_args["policy"] == "Reinforce":
+        return get_reinforce_agent(
             base_args["env_name"], agent_args["gamma"], agent_args["lr"]
         )
 
@@ -468,9 +473,9 @@ def exp_test_pendulum():
     s_agg, sa_agg = get_aggregator(base_args["env_name"])
     import plotting
     for i in range(base_args["num_epochs"]):
-        plotting.plot_sa_heatmap_pendulum(p_sa_from_rollouts(trajectories_codex[i]["all_rollouts"], sa_agg).reshape(12, -1),sa_agg, save_path=f"out/figs/{i}_psa_cov.png")
-        plotting.plot_sa_heatmap_pendulum(p_sa_from_rollouts(trajectories_eo[i]["all_rollouts"], sa_agg).reshape(12, -1),sa_agg, save_path=f"out/figs/{i}_psa_eo.png")
-        plotting.plot_sa_heatmap_pendulum(p_sa_from_rollouts(trajectories_maxent[i]["all_rollouts"], sa_agg).reshape(12, -1),sa_agg,save_path=f"out/figs/{i}_psa_maxent.png")
+        plotting.plot_sa_heatmap_pendulum(p_sa_from_rollouts(trajectories_codex[i]["all_rollouts"], sa_agg), sa_agg, save_path=f"out/figs/{i}_psa_cov.png")
+        plotting.plot_sa_heatmap_pendulum(p_sa_from_rollouts(trajectories_eo[i]["all_rollouts"], sa_agg), sa_agg, save_path=f"out/figs/{i}_psa_eo.png")
+        plotting.plot_sa_heatmap_pendulum(p_sa_from_rollouts(trajectories_maxent[i]["all_rollouts"], sa_agg), sa_agg,save_path=f"out/figs/{i}_psa_maxent.png")
     codex_l1_covs, _ = compute_l1_from_run(base_args, Qlearning_args_l1, trajectories_codex)
     eo_l1_covs, _ = compute_l1_from_run(base_args, Qlearning_args_l1, trajectories_eo)
     maxent_l1_covs, _ = compute_l1_from_run(base_args, Qlearning_args_l1, trajectories_maxent)

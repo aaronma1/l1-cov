@@ -3,7 +3,7 @@ from plotting import plot_heatmap
 from numba import jit, njit
 import lib.tiles3 as tc
 
-from lib.policies import MTCCActionCoder, PendulumActionCoder, DiscreteActionCoder
+from lib.policies import AggregatingActionCoder, DiscreteActionCoder
 
 # Q-learning agent
 class TileCoder:
@@ -228,13 +228,10 @@ class QLearningAgent:
 
         plot_heatmap(Q_sa_table.reshape(12, -1), save_path=save_path)
 
-
-
-
 def get_qlearning_agent(env_name, gamma, lr):
     if env_name == "MountainCarContinuous-v0":
         mctc = TileCoder([-1.2, -0.07],[0.6, 0.07], num_tilings=16, num_tiles=8)
-        mcac = MTCCActionCoder()
+        mcac = AggregatingActionCoder(-1.0, 1.0, num_bins=3)
         return QLearningAgent(mctc,mcac, gamma,lr )
 
     if env_name == "CartPole-v1":
@@ -244,7 +241,7 @@ def get_qlearning_agent(env_name, gamma, lr):
 
     if env_name == "Pendulum-v1":
         pdtc = TileCoder(low=[-1.0, -1.0, -8.0], high=[1.0,1.0,8.0], num_tilings=64, num_tiles=16 )
-        pdac = PendulumActionCoder(num_bins=11)
+        pdac = AggregatingActionCoder(-2.0, 2.0, num_bins=11)
         return QLearningAgent(pdtc, pdac, gamma=gamma, lr=lr)
     
     if env_name == "AcroBot":
@@ -255,8 +252,6 @@ def get_qlearning_agent(env_name, gamma, lr):
         return QLearningAgent(actc, acac, gamma=gamma, lr=lr)
 
     assert False, f"unknown env name {env_name}"
-
-
 
 import itertools
 import gymnasium as gym

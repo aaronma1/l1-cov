@@ -386,5 +386,9 @@ if __name__ == "__main__":
         for i in range(test_sa_table.size):
             assert test_sa_table1[tuple(sa_agg.idx_to_features(i))] == test_sa_table[i]
 
-    s_test()
-    sa_test()
+    #s_test()
+    #sa_test()
+
+
+    s_agg, sa_agg = get_aggregator("MountainCarContinuous-v0")
+

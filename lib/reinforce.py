@@ -15,8 +15,7 @@ import copy
 
 import gc
 
-from lib.policies import collect_rollouts
-from lib.qlearningpolicy import MTCCActionCoder, PendulumActionCoder
+from lib.policies import AggregatingActionCoder, DiscreteActionCoder
 
 
 class ReinforcePolicy(nn.Module):
@@ -148,11 +147,28 @@ class ReinforcePolicy(nn.Module):
                 print('Episode {}\tEpisode reward {:.2f}\tRunning reward: {:.2f}\tLoss: {:.2f}'.format(
                     i_episode, ep_reward, running_reward, running_loss))
 
+
+def get_reinforce_agent(env_name, gamma, lr):
+    if env_name == "MountainCarContinuous-v0":
+        mcac = AggregatingActionCoder(-1.0, 1.0, num_bins=3)
+        return ReinforcePolicy(gamma, lr, 2, mcac)
+
+    if env_name == "CartPole-v1":
+        cpac = DiscreteActionCoder(2)
+        return ReinforcePolicy(gamma, lr, 4, cpac)
+
+    if env_name == "Pendulum-v1":
+        pdac = AggregatingActionCoder(-2.0, 2.0, num_bins=11)
+        return ReinforcePolicy(gamma, lr, 3, pdac )
     
+    if env_name == "AcroBot":
+        acac = DiscreteActionCoder(3)
+        return ReinforcePolicy(gamma, lr, 6, acac)
+
+    assert False, f"unknown env name {env_name}"
 
 
-
-from lib.policies import collect_rollouts
+from lib.trajectories import collect_rollouts
 
 
 if __name__ == "__main__":
@@ -163,7 +179,7 @@ if __name__ == "__main__":
     env_name = "Pendulum-v1"
     # Make environment.
     env = gym.make(env_name, render_mode="rgb_array")
-    mtac = PendulumActionCoder(num_bins=11)
+    mtac = AggregatingActionCoder(-2.0, 2.0, num_bins=11)
     policy = ReinforcePolicy( 0.99, 0.001, 3, mtac)
     env1 = gym.wrappers.RecordVideo(env, video_folder="videos/reinforce_test", episode_trigger=lambda e: True)
     policy.learn_policy(env, None, 10000, 200)

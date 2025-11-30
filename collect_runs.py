@@ -183,13 +183,19 @@ def collect_run_sa_eigenoptions(base_args, option_args, node_num=0):
             collect_rollouts_from_options(env, base_args, option_args, options)
         )
         SR = sa_sr_from_rollouts(epoch_rollouts[-1]["all_rollouts"], sa_agg)
+
+        from plotting import plot_heatmap, plot_sa_heatmap_pendulum
+        plot_heatmap(SR.toarray(), save_path=f"{i}sr.png")
         p_sa = p_sa_from_rollouts(epoch_rollouts[-1]["all_rollouts"], sa_agg)
+
+        plot_sa_heatmap_pendulum(p_sa, sa_agg, save_path=f"{i}psa.png")
 
         eigenvectors, eigenvalues = eig_sparse(SR, k=10)
         top_eig = sa_agg.unflatten_sa_table(eigenvectors[:, 0])
         top_eig /= np.max(np.abs(top_eig))
         if np.dot(top_eig.flatten(), p_sa.flatten()) > 0:
             top_eig = -top_eig
+        plot_sa_heatmap_pendulum(top_eig, sa_agg, save_path=f"{i}_topeig.png")
         
         reward = SAS_Reward(sa_agg, top_eig)
         # learn an option
@@ -222,6 +228,8 @@ def collect_run_codex(base_args, option_args):
         l1_cov_reward = (
             reward_shaping(1 / (base_args["l1_eps"] * uniform_density_sa + p_sa))
         )
+        from plotting import plot_sa_heatmap_pendulum
+        plot_sa_heatmap_pendulum(l1_cov_reward, sa_agg, save_path=f"{i}_cov_reward.png")
 
         reward_fn = SA_Reward(sa_agg, l1_cov_reward)
         # learn policy
@@ -423,21 +431,21 @@ def exp_test_pendulum():
         "l1_eps": 1e-4,  # regularizer epsilon for
         "bin_res": 1,
         "env_name": "Pendulum-v1",
-        "env_T": 200,
+        "env_T": 400,
         "num_rollouts": 400,
-        "num_epochs": 3,
+        "num_epochs": 10,
     }
 
     Qlearning_args = {
         "policy": "Qlearning",
         "gamma": 0.99,
         "lr": 0.01,
-        "online_epochs": 100,
+        "online_epochs": 1000,
         "offline_epochs": 10,
         "learning_args": {
-            "epsilon_start": 1,
+            "epsilon_start": 0.1,
             "epsilon_decay": 0.999,
-            "decay_every": 5,
+            "decay_every": 1,
             "verbose": True,
             "print_every": 100,
         },
@@ -466,8 +474,8 @@ def exp_test_pendulum():
         "print_every": 100,
     }
     
-    trajectories_codex, _ = collect_run_codex(base_args, Qlearning_args)
     trajectories_eo, _ = collect_run_sa_eigenoptions(base_args, Qlearning_args)
+    trajectories_codex, _ = collect_run_codex(base_args, Qlearning_args)
     trajectories_maxent, _ = collect_run_maxent(base_args, Qlearning_args)
     
     s_agg, sa_agg = get_aggregator(base_args["env_name"])

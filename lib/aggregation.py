@@ -221,7 +221,7 @@ class S_Reward:
         self.reward_table = reward_table
 
     def __call__(self, state, action, next_state):
-        return self.reward_table[tuple(self.agg.s_to_features(state))]
+        return self.reward_table[tuple(self.agg.s_to_features(next_state))]
 
 
 class SA_Reward:
@@ -290,7 +290,7 @@ def get_aggregator(env_name, bin_res=1):
         s_high = [1.0, 1.0, 8.0]
         a_low = [-2.0]
         a_high= [2.0]
-        s_bins = [20,20, 40]
+        s_bins = [8,8,8]
         act_bins = [3]
         act_high = [2.0]
         act_low = [-2.0]

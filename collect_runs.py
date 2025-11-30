@@ -1,6 +1,8 @@
 from lib.policies import (
-    average_reward_from_rollouts,
     get_random_agent,
+)
+from lib.trajectories import (
+    average_reward_from_rollouts,
     sr_from_rollouts,
     p_s_from_rollouts,
     p_sa_from_rollouts,

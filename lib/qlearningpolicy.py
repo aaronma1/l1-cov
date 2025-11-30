@@ -260,7 +260,7 @@ def get_qlearning_agent(env_name, gamma, lr):
 
 import itertools
 import gymnasium as gym
-from lib.policies import collect_rollouts
+from lib.trajectories import collect_rollouts
 if __name__ == "__main__":
     # env_name = "MountainCarContinuous-v0"
     # env = gym.make("MountainCarContinuous-v0", render_mode="rgb_array")

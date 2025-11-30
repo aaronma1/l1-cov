@@ -280,3 +280,25 @@ def collect_rollouts(env, agent, T, num_rollouts, reward_fn = None, epsilon=0.0)
     for i in range(num_rollouts):
         rollouts.add_trajectory(_collect_rollout(env, agent, T, reward_fn, epsilon))
     return rollouts
+
+import itertools
+import gymnasium as gym
+from lib.policies import get_random_agent
+from lib.aggregation import get_aggregator
+if __name__ == "__main__":
+
+    # env_name = "CartPole-v1"
+    env_name = "MountainCarContinuous-v0"
+    # env = gym.make("MountainCarContinuous-v0", render_mode="rgb_array")
+    env = gym.make(env_name, render_mode="rgb_array") 
+    agent = get_random_agent(env_name)
+
+    s_agg, sa_agg = get_aggregator(env_name, bin_res=1)
+    rollouts = collect_rollouts(env, agent, 1000, 100)
+
+    p = p_s_from_rollouts(rollouts, s_agg)
+    p_sa = p_sa_from_rollouts(rollouts, sa_agg)
+    sr = sr_from_rollouts(rollouts, s_agg)
+
+    p1 = s_agg.flatten_state_table(p)
+    p2 = s_agg.shape()

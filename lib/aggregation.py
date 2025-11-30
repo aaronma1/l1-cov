@@ -290,7 +290,7 @@ def get_aggregator(env_name, bin_res=1):
         s_high = [1.0, 1.0, 8.0]
         a_low = [-2.0]
         a_high= [2.0]
-        s_bins = [8,8, 16]
+        s_bins = [20,20, 40]
         act_bins = [3]
         act_high = [2.0]
         act_low = [-2.0]
@@ -306,37 +306,37 @@ def get_aggregator(env_name, bin_res=1):
         return Aggregator(s_low, s_high, s_bins), SA_Aggregator_Disc(s_low, s_high, s_bins, num_actions)
 
 
-def flatten_idx(x, v):
-    return x + 12 * v
-
-
-def unflatten_idx(i):
-    return (i % 12, i // 12)
-
-
-def unflatten_state(state):
-    a, b = (12, 11)
-
-    mat = np.zeros(shape=(a, b))
-
-    for i in range(a * b):
-        mat[unflatten_idx(i)] = state[i]
-
-    return mat
-
-
-def flatten_state(state):
-    a, b = (12, 11)
-    mat = np.zeros(shape=(a * b))
-
-    for i in range(a * b):
-        mat[i] = state[unflatten_idx(i)]
-
-    return mat
-
 
 if __name__ == "__main__":
     # quick self-consistency test
+    def flatten_idx(x, v):
+        return x + 12 * v
+
+
+    def unflatten_idx(i):
+        return (i % 12, i // 12)
+
+
+    def unflatten_state(state):
+        a, b = (12, 11)
+
+        mat = np.zeros(shape=(a, b))
+
+        for i in range(a * b):
+            mat[unflatten_idx(i)] = state[i]
+
+        return mat
+
+
+    def flatten_state(state):
+        a, b = (12, 11)
+        mat = np.zeros(shape=(a * b))
+
+        for i in range(a * b):
+            mat[i] = state[unflatten_idx(i)]
+
+        return mat
+
 
     def s_test():
         agg = Aggregator([-1, -1], [1, 1], [12, 11])

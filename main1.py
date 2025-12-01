@@ -1,4 +1,4 @@
-from collect_runs import collect_run_codex, collect_run_sa_eigenoptions, compute_l1_from_run 
+from collect_runs import collect_run_codex, collect_run_sa_eigenoptions, collect_run_random, collect_run_maxent, compute_l1_from_run, compute_stats_from_run
 from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import pickle
@@ -43,7 +43,7 @@ def read_pickle(save_name):
 ######################################
 
 
-def _run_experiment_eigenoptions(base_args, option_args, save_dir, run_id, save_fn):
+def _run_experiment_eigenoptions(base_args, option_args, save_dir, run_id, save_fn=dump_pickle):
     save_path_transitions = os.path.join(save_dir, f"part{run_id}_run.pkl")
     save_path_options = os.path.join(save_dir, f"part{run_id}_options.pkl")
     if os.path.exists(save_path_options) and os.path.exists(save_path_transitions):
@@ -71,7 +71,7 @@ def run_experiment_eigenoptions(base_args, option_args, save_dir, n_runs, max_wo
             del f
 
 
-def _run_experiment_codex(base_args, option_args, save_dir, run_id, save_fn):
+def _run_experiment_codex(base_args, option_args, save_dir, run_id, save_fn=dump_pickle):
     save_path_transitions = os.path.join(save_dir, f"part{run_id}_run.pkl")
     save_path_options = os.path.join(save_dir, f"part{run_id}_options.pkl")
     if os.path.exists(save_path_options) and os.path.exists(save_path_transitions):
@@ -79,7 +79,6 @@ def _run_experiment_codex(base_args, option_args, save_dir, run_id, save_fn):
     transitions, options = collect_run_codex(base_args, option_args)
     save_fn(transitions, save_path_transitions)
     save_fn(options, save_path_options)
-
 def run_experiment_codex(base_args, option_args, save_dir, n_runs, max_workers=16):
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = [
@@ -89,16 +88,58 @@ def run_experiment_codex(base_args, option_args, save_dir, n_runs, max_workers=1
                 option_args=option_args, 
                 save_dir= save_dir,
                 run_id = i,
-                save_fn=dump_pickle
             )
             for i in range(n_runs)
         ]
-
         for i, f in enumerate(as_completed(futures)):
             print(f"done run {i}")
             del f
 
+def _run_experiment_maxent(base_args, option_args, save_dir, run_id, save_fn=dump_pickle):
+    save_path_transitions = os.path.join(save_dir, f"part{run_id}_run.pkl")
+    save_path_options = os.path.join(save_dir, f"part{run_id}_options.pkl")
+    if os.path.exists(save_path_options) and os.path.exists(save_path_transitions):
+        return
+    transitions, options = collect_run_maxent(base_args, option_args)
+    save_fn(transitions, save_path_transitions)
+    save_fn(options, save_path_options)
+def run_experiment_maxent(base_args, option_args, save_dir, n_runs, max_workers=16):
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = [
+            executor.submit(
+                _run_experiment_maxent, 
+                base_args=base_args, 
+                option_args=option_args, 
+                save_dir= save_dir,
+                run_id = i,
+            )
+            for i in range(n_runs)
+        ]
+        for i, f in enumerate(as_completed(futures)):
+            print(f"done run {i}")
+            del f
 
+def _run_experiment_random(base_args, save_dir, run_id, save_fn=dump_pickle):
+    save_path_transitions = os.path.join(save_dir, f"part{run_id}_run.pkl")
+    if os.path.exists(save_path_transitions):
+        return
+    transitions, _ = collect_run_random(base_args)
+    save_fn(transitions, save_path_transitions)
+    
+def run_experiment_random(base_args, save_dir, n_runs, max_workers=16):
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = [
+            executor.submit(
+                _run_experiment_random, 
+                base_args=base_args, 
+                save_dir= save_dir,
+                run_id = i,
+            )
+            for i in range(n_runs)
+        ]
+        for i, f in enumerate(as_completed(futures)):
+            print(f"done run {i}")
+            del f
 
 ######################################
 # L1 coverage computation 
@@ -135,6 +176,36 @@ def compute_l1_from_experiment(base_args, adv_args, exp_dump_path, max_workers=1
             del f
 
     dump_pickle(all_l1_covs, save_path)
+
+
+def _compute_stats_from_experiment(base_args, fpath, read_fn=read_pickle):
+    runs = read_pickle(fpath)
+    stats = compute_stats_from_run(base_args, runs)
+    return stats
+    
+
+def compute_stats_from_experiments(base_args, exp_dump_path, max_workers=16):
+    pickles = list_pickle_runs(exp_dump_path)
+    save_path = os.path.join(exp_dump_path, "all_stats.pkl")
+    stats = None
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = [
+            executor.submit(_compute_stats_from_experiment, base_args=base_args, fpath=fpath)
+            for fpath in pickles
+        ]
+        for i,f in enumerate(as_completed(futures)):
+            run_stats =  f.result()
+
+            if stats == None:
+                stats = {}
+                for key in run_stats.keys():
+                    stats[key] = [run_stats[key]]
+            else:
+                for key in run_stats.keys():
+                    stats[key].append(run_stats[key])
+
+
+
 
 
 ######################################
@@ -215,9 +286,12 @@ def experiments_mountaincar(SAVE_DIR, MAX_WORKERS, N_RUNS, epochs=15):
     compute_l1_from_experiment(base_args, Qlearning_args_adversery, exp_dump_path=save_dir_codex, max_workers=MAX_WORKERS,)
 
 
-
-def experiments_mountaincar_highbins():
+def experiments_pendulum():
     pass
+
+def experiments_cartpole():
+    pass
+
 
 
 

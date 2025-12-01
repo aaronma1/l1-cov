@@ -56,7 +56,8 @@ class QLearningAgent:
     def __init__(self, tilecoder, action_coder, gamma, lr):
         self.stc =  tilecoder
         self.atc = action_coder
-        self.Q_w = np.ones(shape=action_coder.feature_shape() + tilecoder.feature_shape() ) * 1/(1-gamma)
+        # self.Q_w = np.ones(shape=action_coder.feature_shape() + tilecoder.feature_shape() ) * 1/(1-gamma)
+        self.Q_w = np.zeros(shape=action_coder.feature_shape() + tilecoder.feature_shape())
         self.gamma = gamma
         self.lr = lr/(self.stc.num_tilings())
         # all possible actions
@@ -240,14 +241,14 @@ def get_qlearning_agent(env_name, gamma, lr):
         return QLearningAgent(cptc, cpac, gamma=gamma, lr=lr)
 
     if env_name == "Pendulum-v1":
-        pdtc = TileCoder(low=[-1.0, -1.0, -8.0], high=[1.0,1.0,8.0], num_tilings=64, num_tiles=16 )
-        pdac = AggregatingActionCoder(-2.0, 2.0, num_bins=11)
+        pdtc = TileCoder(low=[-1.0, -1.0, -8.0], high=[1.0,1.0,8.0], num_tilings=32, num_tiles=8)
+        pdac = AggregatingActionCoder(-2.0, 2.0, num_bins=21)
         return QLearningAgent(pdtc, pdac, gamma=gamma, lr=lr)
     
-    if env_name == "AcroBot":
+    if env_name == "Acrobot-v1":
         state_low = [-1.0,-1.0, -1.0, -1.0, -13, -28.5]
         state_high = [1.0, 1.0, 1.0, 1.0, 13, 28.5]
-        actc = TileCoder(state_low, state_high, 16, 16) 
+        actc = TileCoder(state_low, state_high, 64, 8) 
         acac = DiscreteActionCoder(3)
         return QLearningAgent(actc, acac, gamma=gamma, lr=lr)
 
@@ -262,14 +263,14 @@ if __name__ == "__main__":
     np.set_printoptions(precision=4)
 
     env_name = "MountainCarContinuous-v0"
-    env_name = "Pendulum-v1"
+    env_name = "Acrobot-v1"
 
     env = gym.make(env_name, render_mode="rgb_array") 
     env_rec = gym.wrappers.RecordVideo(env, video_folder="videos", episode_trigger=lambda e: True)
 
     agent = get_qlearning_agent(env_name, 0.999, 0.01)
 
-    agent.learn_policy(env, 200, 20000, epsilon_start=0.0, epsilon_decay=0.999, decay_every=20, print_every=100)
+    agent.learn_policy(env, 200, 20000, epsilon_start=1.0, epsilon_decay=0.999, decay_every=20, print_every=100)
     collect_rollouts(env_rec, agent, 200, 5, epsilon=0.0)
     agent.learn_policy(env, 200, 20000, epsilon_start=0.300, epsilon_decay=0.999, decay_every=20, print_every=100)
     collect_rollouts(env_rec, agent,  200, 5, epsilon=0.1)

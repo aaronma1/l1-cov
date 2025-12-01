@@ -73,8 +73,8 @@ class RandomAgent:
 # TODO change random agent to use action coders
 def get_random_agent(env_name):
     if env_name == "MountainCarContinuous-v0":
-        mcac = AggregatingActionCoder(-1.0, 1.0, num_bins=7)
-        return RandomAgent(pdac)
+        mcac = AggregatingActionCoder(-1.0, 1.0, num_bins=3)
+        return RandomAgent(mcac)
 
     if env_name == "CartPole-v1":
         return RandomAgent(DiscreteActionCoder(2))
@@ -83,7 +83,7 @@ def get_random_agent(env_name):
         return RandomAgent(DiscreteActionCoder(3))
 
     if env_name == "Pendulum-v1":
-        pdac = AggregatingActionCoder(-2.0, 2.0, num_bins=7)
+        pdac = AggregatingActionCoder(-2.0, 2.0, num_bins=11)
         return RandomAgent(pdac)
 
 

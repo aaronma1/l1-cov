@@ -146,6 +146,10 @@ class ReinforcePolicy(nn.Module):
             if (i_episode) % 100 == 0:
                 print('Episode {}\tEpisode reward {:.2f}\tRunning reward: {:.2f}\tLoss: {:.2f}'.format(
                     i_episode, ep_reward, running_reward, running_loss))
+    
+    def learn_offline_policy(self, rollouts, offline_epochs, reward_fn = None, verbose=False):
+        pass
+
 
 
 def get_reinforce_agent(env_name, gamma, lr):
@@ -161,7 +165,7 @@ def get_reinforce_agent(env_name, gamma, lr):
         pdac = AggregatingActionCoder(-2.0, 2.0, num_bins=11)
         return ReinforcePolicy(gamma, lr, 3, pdac )
     
-    if env_name == "AcroBot":
+    if env_name == "AcroBot-v1":
         acac = DiscreteActionCoder(3)
         return ReinforcePolicy(gamma, lr, 6, acac)
 

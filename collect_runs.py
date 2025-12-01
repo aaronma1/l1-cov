@@ -14,6 +14,7 @@ from lib.reinforce import get_reinforce_agent
 from lib.aggregation import get_aggregator, S_Reward, SA_Reward, SAS_Reward, SS_Reward
 
 from scipy.sparse.linalg import eigsh
+from scipy.stats import entropy
 import gymnasium as gym
 import numpy as np
 
@@ -183,19 +184,12 @@ def collect_run_sa_eigenoptions(base_args, option_args, node_num=0):
             collect_rollouts_from_options(env, base_args, option_args, options)
         )
         SR = sa_sr_from_rollouts(epoch_rollouts[-1]["all_rollouts"], sa_agg)
-
-        from plotting import plot_heatmap, plot_sa_heatmap_pendulum
-        plot_heatmap(SR.toarray(), save_path=f"{i}sr.png")
         p_sa = p_sa_from_rollouts(epoch_rollouts[-1]["all_rollouts"], sa_agg)
-
-        plot_sa_heatmap_pendulum(p_sa, sa_agg, save_path=f"{i}psa.png")
-
         eigenvectors, eigenvalues = eig_sparse(SR, k=10)
         top_eig = sa_agg.unflatten_sa_table(eigenvectors[:, 0])
         top_eig /= np.max(np.abs(top_eig))
         if np.dot(top_eig.flatten(), p_sa.flatten()) > 0:
             top_eig = -top_eig
-        plot_sa_heatmap_pendulum(top_eig, sa_agg, save_path=f"{i}_topeig.png")
         
         reward = SAS_Reward(sa_agg, top_eig)
         # learn an option
@@ -228,9 +222,6 @@ def collect_run_codex(base_args, option_args):
         l1_cov_reward = (
             reward_shaping(1 / (base_args["l1_eps"] * uniform_density_sa + p_sa))
         )
-        from plotting import plot_sa_heatmap_pendulum
-        plot_sa_heatmap_pendulum(l1_cov_reward, sa_agg, save_path=f"{i}_cov_reward.png")
-
         reward_fn = SA_Reward(sa_agg, l1_cov_reward)
         # learn policy
         options.append(
@@ -344,12 +335,29 @@ def compute_l1_from_run(base_args, adv_args, run):
     return l1_covs, adv_policies
 
 
-def compute_run_ent(base_args, transitions):
-    measure_env, s_agg, sa_agg = setup_env(base_args)
-    pass
+def compute_stats_from_run(base_args, transitions):
+    _, s_agg, sa_agg = setup_env(base_args)
+    stats = {
+        "p_sa_entropy": [],
+        "p_s_entropy": [],
+        "visited_s_ratio": [],
+        "visited_sa_ratio": [],
+    }
+    for i, epoch in enumerate(transitions):
+        rollouts = epoch["all_rollouts"]
+        
+        p_sa = p_sa_from_rollouts(rollouts, sa_agg)
+        p_s = p_s_from_rollouts(rollouts, s_agg)
 
-def compute_run_usv(base_args, transitions):
-    pass
+        stats["p_sa_entropy"].append(entropy(p_sa.flatten()))
+        stats["p_s_entropy"].append(entropy(p_s.flatten()))
+        stats["visited_sa_ratio"].append(np.count_nonzero(p_sa)/np.size(p_sa))
+        stats["visited_s_ratio"].append(np.count_nonzero(p_s)/np.size(p_s))
+
+    for key in stats.keys():
+        stats[key] = np.array(stats[key])
+    return stats
+
 
 def exp_test_mountaincar():
     base_args = {
@@ -360,22 +368,12 @@ def exp_test_mountaincar():
         "num_rollouts": 400,
         "num_epochs": 3,
     }
-    # base_args = {
-    #     "gamma":0.999, # global discount factor
-    #     "l1_eps":1e-4, # regularizer epsilon for
-    #     "bin_res": 1,
-    #     "env_name": "CartPole-v1",
-    #     "env_T":200,
-    #     "num_rollouts":400,
-    #     "num_epochs": 5,
-    #     "reward_shaping_constant": 0
-    # }
 
     Qlearning_args = {
         "policy": "Qlearning",
         "gamma": 0.99,
         "lr": 0.01,
-        "online_epochs": 100,
+        "online_epochs": 1000,
         "offline_epochs": 10,
         "learning_args": {
             "epsilon_start": 1,
@@ -394,14 +392,14 @@ def exp_test_mountaincar():
         "policy": "Qlearning",
         "gamma": 0.99,
         "lr": 0.01,
-        "online_epochs": 20000,
+        "online_epochs": 1000,
         "offline_epochs": 0,
         "learning_args": {
-            "epsilon_start": 0.5,
+            "epsilon_start": 0.3,
             "epsilon_decay": 0.999,
-            "decay_every": 3,
+            "decay_every": 1,
             "verbose": True,
-            "print_every": 1000,
+            "print_every": 100,
         },
         "rollout_args": {
             "epsilon": 0.0,
@@ -426,13 +424,21 @@ def exp_test_mountaincar():
     print("EO l1 covs", eo_l1_covs)
     print("Maxent l1 covs", maxent_l1_covs)
 
+    stats_codex = compute_stats_from_run(base_args, trajectories_codex)
+    stats_eo = compute_stats_from_run(base_args, trajectories_eo)
+    stats_maxent = compute_stats_from_run(base_args, trajectories_codex)
+
+    print("codex_stats", stats_codex)
+    print("eo_stats", stats_eo)
+    print("maxent_stats", stats_maxent)
+
 def exp_test_pendulum():
     base_args = {
         "l1_eps": 1e-4,  # regularizer epsilon for
         "bin_res": 1,
         "env_name": "Pendulum-v1",
         "env_T": 400,
-        "num_rollouts": 400,
+        "num_rollouts": 800,
         "num_epochs": 10,
     }
 
@@ -491,6 +497,65 @@ def exp_test_pendulum():
     print("EO l1 covs", eo_l1_covs)
     print("Maxent l1 covs", maxent_l1_covs)
 
+def exp_test_cartpole():
+    base_args = {
+        "l1_eps": 1e-4,  # regularizer epsilon for
+        "bin_res": 1,
+        "env_name": "CartPole-v1",
+        "env_T": 400,
+        "num_rollouts": 400,
+        "num_epochs": 10,
+    }
+
+    Qlearning_args = {
+        "policy": "Qlearning",
+        "gamma": 0.99,
+        "lr": 0.01,
+        "online_epochs": 1000,
+        "offline_epochs": 10,
+        "learning_args": {
+            "epsilon_start": 0.1,
+            "epsilon_decay": 0.999,
+            "decay_every": 1,
+            "verbose": True,
+            "print_every": 100,
+        },
+        "rollout_args": {
+            "epsilon": 0.0,
+        },
+    }
+    # more comprehensive qlearning args for l1 coverage
+    Qlearning_args_l1 = {
+        # base_args = {
+        "policy": "Qlearning",
+        "gamma": 0.99,
+        "lr": 0.01,
+        "online_epochs": 20000,
+        "offline_epochs": 0,
+        "learning_args": {
+            "epsilon_start": 0.5,
+            "epsilon_decay": 0.999,
+            "decay_every": 3,
+            "verbose": True,
+            "print_every": 1000,
+        },
+        "rollout_args": {
+            "epsilon": 0.0,
+        },
+        "print_every": 100,
+    }
+    
+    trajectories_eo, _ = collect_run_sa_eigenoptions(base_args, Qlearning_args)
+    trajectories_codex, _ = collect_run_codex(base_args, Qlearning_args)
+    trajectories_maxent, _ = collect_run_maxent(base_args, Qlearning_args)
+    
+    codex_l1_covs, _ = compute_l1_from_run(base_args, Qlearning_args_l1, trajectories_codex)
+    eo_l1_covs, _ = compute_l1_from_run(base_args, Qlearning_args_l1, trajectories_eo)
+    maxent_l1_covs, _ = compute_l1_from_run(base_args, Qlearning_args_l1, trajectories_maxent)
+    print("codex l1 covs", codex_l1_covs)
+    print("EO l1 covs", eo_l1_covs)
+    print("Maxent l1 covs", maxent_l1_covs)
+
 
 if __name__ == "__main__":
-    exp_test_pendulum()
+    exp_test_mountaincar()

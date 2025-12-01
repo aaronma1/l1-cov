@@ -248,7 +248,7 @@ class SS_Reward:
 
 class SAS_Reward:
 
-    def __init__(self, sa_agg, reward_table, reduce_fn = np.mean):
+    def __init__(self, sa_agg, reward_table, reduce_fn = np.max):
         self.agg = sa_agg
         self.reward_table = sa_agg.flatten_sa_table(reward_table)
         self.reduce_fn = reduce_fn

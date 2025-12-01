@@ -157,10 +157,12 @@ def _compute_l1_from_experiment(base_args, adv_args, fpath, read_fn=read_pickle)
 
 
 
-def compute_l1_from_experiment(base_args, adv_args, exp_dump_path, max_workers=16):
+def compute_l1_from_experiment(base_args, adv_args, exp_dump_path, save_path=None, max_workers=16):
     pickles = list_pickle_runs(exp_dump_path)
     all_l1_covs = []
-    save_path = os.path.join(exp_dump_path, "all_l1_covs.pkl")
+
+    if save_path == None:
+        save_path = exp_dump_path[:-1] + "_l1_covs.pkl"
 
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = [
@@ -184,9 +186,10 @@ def _compute_stats_from_experiment(base_args, fpath, read_fn=read_pickle):
     return stats
     
 
-def compute_stats_from_experiments(base_args, exp_dump_path, max_workers=16):
+def compute_stats_from_experiments(base_args, exp_dump_path, save_path=None,  max_workers=16):
     pickles = list_pickle_runs(exp_dump_path)
-    save_path = os.path.join(exp_dump_path, "all_stats.pkl")
+    if save_path == None:
+        save_path = exp_dump_path[:-1]+"_stats.pkl"
     stats = None
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = [
@@ -384,11 +387,6 @@ def parse_args():
         type=str,
         default="out",
         help="Save path"
-    )
-
-    parser.add_argument(
-        "--exp", 
-
     )
 
     return parser.parse_args()

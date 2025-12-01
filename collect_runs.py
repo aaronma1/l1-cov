@@ -12,6 +12,7 @@ from lib.trajectories import (
 from lib.qlearningpolicy import get_qlearning_agent
 from lib.reinforce import get_reinforce_agent
 from lib.aggregation import get_aggregator, S_Reward, SA_Reward, SAS_Reward, SS_Reward
+import plotting
 
 from scipy.sparse.linalg import eigsh
 from scipy.stats import entropy
@@ -179,7 +180,6 @@ def collect_run_sa_eigenoptions(base_args, option_args, node_num=0):
     epoch_rollouts = []
 
     for i in range(base_args["num_epochs"]):
-        print(f"epoch {i}")
         epoch_rollouts.append(
             collect_rollouts_from_options(env, base_args, option_args, options)
         )
@@ -188,10 +188,11 @@ def collect_run_sa_eigenoptions(base_args, option_args, node_num=0):
         eigenvectors, eigenvalues = eig_sparse(SR, k=10)
         top_eig = sa_agg.unflatten_sa_table(eigenvectors[:, 0])
         top_eig /= np.max(np.abs(top_eig))
+
         if np.dot(top_eig.flatten(), p_sa.flatten()) > 0:
             top_eig = -top_eig
         
-        reward = SAS_Reward(sa_agg, top_eig)
+        reward = SA_Reward(sa_agg, top_eig)
         # learn an option
         options.append(
             learn_policy(
@@ -364,26 +365,28 @@ def exp_test_mountaincar():
         "bin_res": 1,
         "env_name": "MountainCarContinuous-v0",
         "env_T": 200,
-        "num_rollouts": 400,
+        "num_rollouts": 200,
         "num_epochs": 3,
     }
 
-    Qlearning_args = {
+    option_args = {
         "policy": "Qlearning",
-        "gamma": 0.99,
-        "lr": 0.01,
-        "online_epochs": 1000,
-        "offline_epochs": 10,
+        "gamma":0.99,
+        "lr":0.01,
+        "online_epochs":1000,
+        "offline_epochs":10,
+
+
         "learning_args": {
-            "epsilon_start": 1,
+            "epsilon_start": 0.5,
             "epsilon_decay": 0.999,
-            "decay_every": 5,
+            "decay_every": 1,
             "verbose": True,
             "print_every": 100,
         },
         "rollout_args": {
             "epsilon": 0.0,
-        },
+        }
     }
     # more comprehensive qlearning args for l1 coverage
     Qlearning_args_l1 = {
@@ -405,14 +408,22 @@ def exp_test_mountaincar():
         },
         "print_every": 100,
     }
+    trajectories_eo, _ = collect_run_sa_eigenoptions(base_args, option_args)
+    s_agg, sa_agg = get_aggregator(base_args["env_name"])
+    for i in range(base_args["num_epochs"]):
+        plotting.plot_heatmap(p_sa_from_rollouts(trajectories_eo[i]["all_rollouts"], sa_agg).reshape(12, -1),save_path=f"out/figs/{i}_psa_eo.png")
+    stats_eo = compute_stats_from_run(base_args, trajectories_eo)
+    eo_l1_covs, _ = compute_l1_from_run(base_args, Qlearning_args_l1, trajectories_eo)
+    print("EO l1 covs", eo_l1_covs)
+    print("eo_stats", stats_eo)
+    return
     
     trajectories_codex, _ = collect_run_random(base_args)
-    trajectories_codex, _ = collect_run_codex(base_args, Qlearning_args)
-    trajectories_eo, _ = collect_run_sa_eigenoptions(base_args, Qlearning_args)
-    trajectories_maxent, _ = collect_run_maxent(base_args, Qlearning_args)
+    trajectories_codex, _ = collect_run_codex(base_args, option_args)
+    trajectories_eo, _ = collect_run_sa_eigenoptions(base_args, option_args)
+    trajectories_maxent, _ = collect_run_maxent(base_args, option_args)
     
     s_agg, sa_agg = get_aggregator(base_args["env_name"])
-    import plotting
     for i in range(base_args["num_epochs"]):
         plotting.plot_heatmap(p_sa_from_rollouts(trajectories_codex[i]["all_rollouts"], sa_agg).reshape(12, -1), save_path=f"out/figs/{i}_psa_cov.png")
         plotting.plot_heatmap(p_sa_from_rollouts(trajectories_eo[i]["all_rollouts"], sa_agg).reshape(12, -1),save_path=f"out/figs/{i}_psa_eo.png")
@@ -485,7 +496,6 @@ def exp_test_pendulum():
     trajectories_maxent, _ = collect_run_maxent(base_args, Qlearning_args)
     
     s_agg, sa_agg = get_aggregator(base_args["env_name"])
-    import plotting
     for i in range(base_args["num_epochs"]):
         plotting.plot_sa_heatmap_pendulum(p_sa_from_rollouts(trajectories_codex[i]["all_rollouts"], sa_agg), sa_agg, save_path=f"out/figs/{i}_psa_cov.png")
         plotting.plot_sa_heatmap_pendulum(p_sa_from_rollouts(trajectories_eo[i]["all_rollouts"], sa_agg), sa_agg, save_path=f"out/figs/{i}_psa_eo.png")
@@ -558,4 +568,5 @@ def exp_test_cartpole():
 
 
 if __name__ == "__main__":
+    print(plotting)
     exp_test_mountaincar()

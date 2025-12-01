@@ -203,8 +203,50 @@ def compute_stats_from_experiments(base_args, exp_dump_path, max_workers=16):
             else:
                 for key in run_stats.keys():
                     stats[key].append(run_stats[key])
+    dump_pickle(stats, save_path)
 
 
+def run_experiments(base_args, option_args, adversery_args, N_RUNS, SAVE_DIR, MAX_WORKERS):
+    os.makedirs(SAVE_DIR, exist_ok=True)
+    params = {
+        "args_codex": (base_args, option_args),
+        "args_eigenoptions": (base_args, option_args),
+        "l1_cov_args": (base_args, adversery_args),
+    }
+    dump_pickle(params, os.path.join(SAVE_DIR, "params.pkl"))
+
+    print("#### collecting random rollouts ####")
+    save_dir_random = os.path.join(SAVE_DIR, "random/")
+    os.makedirs(save_dir_random, exist_ok=True)
+    run_experiment_random(base_args, save_dir_random, n_runs=N_RUNS, max_workers=MAX_WORKERS)
+    print("#### computing random l1 coverage ####")
+    compute_l1_from_experiment(base_args, adversery_args, exp_dump_path=save_dir_random, max_workers=MAX_WORKERS)
+    compute_stats_from_experiments(base_args, exp_dump_path=save_dir_random)
+
+    print("#### collecting maxent rollouts ####")
+    save_dir_maxent = os.path.join(SAVE_DIR, "maxent/")
+    os.makedirs(save_dir_maxent, exist_ok=True)
+    run_experiment_maxent(base_args, option_args, save_dir=save_dir_maxent, max_workers=MAX_WORKERS, n_runs=N_RUNS)
+    compute_l1_from_experiment(base_args, adversery_args, exp_dump_path=save_dir_maxent, max_workers=MAX_WORKERS,)
+    compute_stats_from_experiments(base_args, exp_dump_path=save_dir_maxent)
+
+
+    print("#### collecting eigenoptions rollouts ####")
+    save_dir_eigenoptions = os.path.join(SAVE_DIR, "eigenoptions/")
+    os.makedirs(save_dir_eigenoptions, exist_ok=True)
+    run_experiment_eigenoptions(base_args, option_args, save_dir=save_dir_eigenoptions, max_workers=MAX_WORKERS, n_runs=N_RUNS)
+    print("#### computing eigenoptions l1 coverage ####")
+    compute_l1_from_experiment(base_args, adversery_args, exp_dump_path=save_dir_eigenoptions, max_workers=MAX_WORKERS)
+    compute_stats_from_experiments(base_args, exp_dump_path=save_dir_eigenoptions)
+
+
+    print("#### collecting codex rollouts ####")
+    save_dir_codex = os.path.join(SAVE_DIR, "codex/")
+    os.makedirs(save_dir_codex, exist_ok=True)
+    run_experiment_codex(base_args, option_args, save_dir=save_dir_codex, max_workers=MAX_WORKERS, n_runs=N_RUNS)
+    print("#### computing codex l1 coverage ####")
+    compute_l1_from_experiment(base_args, adversery_args, exp_dump_path=save_dir_codex, max_workers=MAX_WORKERS,)
+    compute_stats_from_experiments(base_args, exp_dump_path=save_dir_codex)
 
 
 
@@ -223,7 +265,7 @@ def experiments_mountaincar(SAVE_DIR, MAX_WORKERS, N_RUNS, epochs=15):
         "reward_shaping_constant": -1
     }
 
-    Qlearning_args_eigenoptions = {
+    option_args = {
         "policy": "Qlearning",
         "gamma":0.99,
         "lr":0.01,
@@ -243,8 +285,7 @@ def experiments_mountaincar(SAVE_DIR, MAX_WORKERS, N_RUNS, epochs=15):
         }
     }
 
-    Qlearning_args_adversery = {
-    # base_args = {
+    adversery_args = {
         "policy": "Qlearning",
         "gamma":0.99,
         "lr":0.01,
@@ -262,40 +303,55 @@ def experiments_mountaincar(SAVE_DIR, MAX_WORKERS, N_RUNS, epochs=15):
             "epsilon": 0.0,
         }
     }
-    save_dir_eigenoptions = os.path.join(SAVE_DIR, "eigenoptions/")
-    os.makedirs(save_dir_eigenoptions, exist_ok=True)
+    run_experiments(base_args, option_args, adversery_args, N_RUNS, SAVE_DIR, MAX_WORKERS)
 
-    params = {
-        "args_codex": (base_args, Qlearning_args_eigenoptions),
-        "args_eigenoptions": (base_args, Qlearning_args_eigenoptions),
-        "l1_cov_args": (base_args, Qlearning_args_adversery),
+def experiments_pendulum(SAVE_DIR, N_RUNS, MAX_WORKERS, epochs=15):
+    base_args = {
+        "l1_eps": 1e-4,  # regularizer epsilon for
+        "bin_res": 1,
+        "env_name": "Pendulum-v1",
+        "env_T": 200,
+        "num_rollouts": 400,
+        "num_epochs": epochs,
     }
-    dump_pickle(params, os.path.join(SAVE_DIR, "params.pkl"))
 
-    print("#### collecting eigenoptions rollouts ####")
-    run_experiment_eigenoptions(base_args, Qlearning_args_eigenoptions, save_dir=save_dir_eigenoptions, max_workers=MAX_WORKERS, n_runs=N_RUNS)
-    print("#### computing eigenoptions l1 coverage ####")
-    compute_l1_from_experiment(base_args, Qlearning_args_adversery, exp_dump_path=save_dir_eigenoptions, max_workers=MAX_WORKERS)
-
-    save_dir_codex = os.path.join(SAVE_DIR, "codex/")
-    os.makedirs(save_dir_codex, exist_ok=True)
-
-    print("#### collecting codex rollouts ####")
-    run_experiment_codex(base_args, Qlearning_args_eigenoptions, save_dir=save_dir_codex, max_workers=MAX_WORKERS, n_runs=N_RUNS)
-    print("#### computing codex l1 coverage ####")
-    compute_l1_from_experiment(base_args, Qlearning_args_adversery, exp_dump_path=save_dir_codex, max_workers=MAX_WORKERS,)
-
-
-def experiments_pendulum():
-    pass
-
-def experiments_cartpole():
-    pass
-
-
-
-
-    
+    option_args = {
+        "policy": "Qlearning",
+        "gamma": 0.99,
+        "lr": 0.01,
+        "online_epochs": 1000,
+        "offline_epochs": 10,
+        "learning_args": {
+            "epsilon_start": 0.5,
+            "epsilon_decay": 0.99,
+            "decay_every": 1,
+            "verbose": True,
+            "print_every": 100,
+        },
+        "rollout_args": {
+            "epsilon": 0.0,
+        },
+    }
+    adversery_args = {
+        # base_args = {
+        "policy": "Qlearning",
+        "gamma": 0.99,
+        "lr": 0.01,
+        "online_epochs": 20000,
+        "offline_epochs": 0,
+        "learning_args": {
+            "epsilon_start": 0.0,
+            "epsilon_decay": 0.999,
+            "decay_every": 0,
+            "verbose": True,
+            "print_every": 1000,
+        },
+        "rollout_args": {
+            "epsilon": 0.0,
+        },
+        "print_every": 100,
+    }
+    run_experiments(base_args, option_args, adversery_args, N_RUNS, SAVE_DIR, MAX_WORKERS)
 
 
 def parse_args():
@@ -328,10 +384,15 @@ def parse_args():
         help="Save path"
     )
 
+    parser.add_argument(
+        "--exp", 
+
+    )
+
     return parser.parse_args()
 
 if __name__ == "__main__":
 
     args = parse_args()
-    multiprocessing.set_start_method("spawn", force=True) 
+    # multiprocessing.set_start_method("spawn", force=True) 
     experiments_mountaincar(SAVE_DIR=args.save_path, N_RUNS=args.n_runs,MAX_WORKERS=args.max_workers, epochs=args.epochs)

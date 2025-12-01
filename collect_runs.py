@@ -272,7 +272,6 @@ def collect_run_maxent(base_args, option_args):
     return epoch_rollouts, options
 
 def collect_run_random(base_args):
-    s_agg, sa_agg = get_aggregator(base_args["env_name"], bin_res=1)
     env = gym.make(base_args["env_name"], render_mode="rgb_array")
 
     options = [get_random_agent(env_name=base_args["env_name"])]
@@ -280,11 +279,11 @@ def collect_run_random(base_args):
 
     for i in range(base_args["num_epochs"]):
         epoch_rollouts.append(
-            collect_rollouts_from_options(env, base_args, {}, options)
+            collect_rollouts_from_options(env, base_args, {"rollout_args": {}}, options)
         )
         options += [get_random_agent(env_name=base_args["env_name"])]
 
-    epoch_rollouts.append(collect_rollouts_from_options(env, base_args, {}, options))
+    epoch_rollouts.append(collect_rollouts_from_options(env, base_args, {"rollout_args": {}}, options))
     return epoch_rollouts, options
 
 ###########################################
@@ -407,6 +406,7 @@ def exp_test_mountaincar():
         "print_every": 100,
     }
     
+    trajectories_codex, _ = collect_run_random(base_args)
     trajectories_codex, _ = collect_run_codex(base_args, Qlearning_args)
     trajectories_eo, _ = collect_run_sa_eigenoptions(base_args, Qlearning_args)
     trajectories_maxent, _ = collect_run_maxent(base_args, Qlearning_args)
@@ -533,10 +533,10 @@ def exp_test_cartpole():
         "online_epochs": 20000,
         "offline_epochs": 0,
         "learning_args": {
-            "epsilon_start": 0.5,
+            "epsilon_start": 0.0,
             "epsilon_decay": 0.999,
             "decay_every": 3,
-            "verbose": True,
+            "verbose": False,
             "print_every": 1000,
         },
         "rollout_args": {

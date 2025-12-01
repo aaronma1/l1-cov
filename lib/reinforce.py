@@ -147,7 +147,7 @@ class ReinforcePolicy(nn.Module):
                 print('Episode {}\tEpisode reward {:.2f}\tRunning reward: {:.2f}\tLoss: {:.2f}'.format(
                     i_episode, ep_reward, running_reward, running_loss))
     
-    def learn_offline_policy(self, rollouts, offline_epochs, reward_fn = None, verbose=False):
+    def learn_offline_policy(self, rollouts, offline_epochs):
         pass
 
 

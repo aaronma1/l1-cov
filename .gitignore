@@ -1,4 +1,4 @@
-__pycache__
+./_pycache__
 lib/__pycache__
 .venv/*
 out/*

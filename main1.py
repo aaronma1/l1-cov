@@ -1,15 +1,13 @@
-from collect_runs import collect_run_codex, collect_run_sa_eigenoptions, collect_run_random, collect_run_maxent, compute_l1_from_run, compute_stats_from_run
-from concurrent.futures import ProcessPoolExecutor, as_completed
 
 import pickle
 import os
-import threading
 import tempfile
-
-import multiprocessing
-import math
-
 import argparse
+
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import numpy as np
+
+from collect_runs import collect_run_codex, collect_run_sa_eigenoptions, collect_run_random, collect_run_maxent, compute_l1_from_run, compute_stats_from_run
 
 
 ######################################
@@ -175,6 +173,8 @@ def compute_l1_from_experiment(base_args, adv_args, exp_dump_path, max_workers=1
             all_l1_covs.append(l1)
             del f
 
+
+    all_l1_covs = np.array(all_l1_covs)
     dump_pickle(all_l1_covs, save_path)
 
 
@@ -203,6 +203,8 @@ def compute_stats_from_experiments(base_args, exp_dump_path, max_workers=16):
             else:
                 for key in run_stats.keys():
                     stats[key].append(run_stats[key])
+    for key in run_stats.keys():
+        stats[key] = np.array(stats[key])
     dump_pickle(stats, save_path)
 
 

@@ -371,7 +371,7 @@ def exp_test_mountaincar():
 
     option_args = {
         "policy": "Qlearning",
-        "gamma":0.99,
+        "gamma":1.0,
         "lr":0.01,
         "online_epochs":1000,
         "offline_epochs":10,
@@ -394,7 +394,7 @@ def exp_test_mountaincar():
         "policy": "Qlearning",
         "gamma": 0.99,
         "lr": 0.01,
-        "online_epochs": 1000,
+        "online_epochs": 10000,
         "offline_epochs": 0,
         "learning_args": {
             "epsilon_start": 0.3,
@@ -476,7 +476,7 @@ def exp_test_pendulum():
         "policy": "Qlearning",
         "gamma": 0.99,
         "lr": 0.01,
-        "online_epochs": 20000,
+        "online_epochs": 10000,
         "offline_epochs": 0,
         "learning_args": {
             "epsilon_start": 0.5,
@@ -540,7 +540,7 @@ def exp_test_cartpole():
         "policy": "Qlearning",
         "gamma": 0.99,
         "lr": 0.01,
-        "online_epochs": 20000,
+        "online_epochs": 10000,
         "offline_epochs": 0,
         "learning_args": {
             "epsilon_start": 0.0,
@@ -568,5 +568,4 @@ def exp_test_cartpole():
 
 
 if __name__ == "__main__":
-    print(plotting)
     exp_test_mountaincar()

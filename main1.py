@@ -279,7 +279,7 @@ def experiments_mountaincar(SAVE_DIR, MAX_WORKERS, N_RUNS, epochs=15):
 
 
         "learning_args": {
-            "epsilon_start": 0.5,
+            "epsilon_start": 0.2,
             "epsilon_decay": 0.999,
             "decay_every": 1,
             "verbose": False,
@@ -300,7 +300,7 @@ def experiments_mountaincar(SAVE_DIR, MAX_WORKERS, N_RUNS, epochs=15):
         "learning_args": {
             "epsilon_start": 0.5,
             "epsilon_decay": 0.999,
-            "decay_every": 3,
+            "decay_every": 2,
             "verbose": False,
             "print_every": 100,
         },

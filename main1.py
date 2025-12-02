@@ -389,10 +389,13 @@ def parse_args():
         help="Save path"
     )
 
+
     return parser.parse_args()
 
 if __name__ == "__main__":
 
     args = parse_args()
     # multiprocessing.set_start_method("spawn", force=True) 
+
+    
     experiments_mountaincar(SAVE_DIR=args.save_path, N_RUNS=args.n_runs,MAX_WORKERS=args.max_workers, epochs=args.epochs)

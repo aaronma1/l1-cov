@@ -214,9 +214,10 @@ def compute_stats_from_experiments(base_args, exp_dump_path, save_path=None,  ma
 def run_experiments(base_args, option_args, adversery_args, N_RUNS, SAVE_DIR, MAX_WORKERS):
     os.makedirs(SAVE_DIR, exist_ok=True)
     params = {
-        "args_codex": (base_args, option_args),
-        "args_eigenoptions": (base_args, option_args),
-        "l1_cov_args": (base_args, adversery_args),
+        "base_args": base_args, 
+        "option_args":option_args,
+        "adversery_args":adversery_args,
+
     }
     dump_pickle(params, os.path.join(SAVE_DIR, "params.pkl"))
 

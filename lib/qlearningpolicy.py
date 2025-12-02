@@ -56,8 +56,7 @@ class QLearningAgent:
     def __init__(self, tilecoder, action_coder, gamma, lr):
         self.stc =  tilecoder
         self.atc = action_coder
-        # self.Q_w = np.ones(shape=action_coder.feature_shape() + tilecoder.feature_shape() ) * 1/(1-gamma)
-        self.Q_w = np.zeros(shape=action_coder.feature_shape() + tilecoder.feature_shape())
+        self.Q_w = np.ones(shape=action_coder.feature_shape() + tilecoder.feature_shape() ) * 1/(1-gamma)
         self.gamma = gamma
         self.lr = lr/(self.stc.num_tilings())
         # all possible actions

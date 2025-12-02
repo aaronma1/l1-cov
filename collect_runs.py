@@ -365,20 +365,20 @@ def exp_test_mountaincar():
         "bin_res": 1,
         "env_name": "MountainCarContinuous-v0",
         "env_T": 200,
-        "num_rollouts": 200,
+        "num_rollouts": 400,
         "num_epochs": 3,
     }
 
     option_args = {
         "policy": "Qlearning",
-        "gamma":1.0,
+        "gamma":0.99,
         "lr":0.01,
         "online_epochs":1000,
-        "offline_epochs":10,
+        "offline_epochs":15,
 
 
         "learning_args": {
-            "epsilon_start": 0.5,
+            "epsilon_start": 0.1,
             "epsilon_decay": 0.999,
             "decay_every": 1,
             "verbose": True,
@@ -408,15 +408,15 @@ def exp_test_mountaincar():
         },
         "print_every": 100,
     }
-    trajectories_eo, _ = collect_run_sa_eigenoptions(base_args, option_args)
-    s_agg, sa_agg = get_aggregator(base_args["env_name"])
-    for i in range(base_args["num_epochs"]):
-        plotting.plot_heatmap(p_sa_from_rollouts(trajectories_eo[i]["all_rollouts"], sa_agg).reshape(12, -1),save_path=f"out/figs/{i}_psa_eo.png")
-    stats_eo = compute_stats_from_run(base_args, trajectories_eo)
-    eo_l1_covs, _ = compute_l1_from_run(base_args, Qlearning_args_l1, trajectories_eo)
-    print("EO l1 covs", eo_l1_covs)
-    print("eo_stats", stats_eo)
-    return
+    # trajectories_eo, _ = collect_run_sa_eigenoptions(base_args, option_args)
+    # s_agg, sa_agg = get_aggregator(base_args["env_name"])
+    # for i in range(base_args["num_epochs"]):
+    #     plotting.plot_heatmap(p_sa_from_rollouts(trajectories_eo[i]["all_rollouts"], sa_agg).reshape(12, -1),save_path=f"out/figs/{i}_psa_eo.png")
+    # stats_eo = compute_stats_from_run(base_args, trajectories_eo)
+    # eo_l1_covs, _ = compute_l1_from_run(base_args, Qlearning_args_l1, trajectories_eo)
+    # print("EO l1 covs", eo_l1_covs)
+    # print("eo_stats", stats_eo)
+    # return
     
     trajectories_codex, _ = collect_run_random(base_args)
     trajectories_codex, _ = collect_run_codex(base_args, option_args)

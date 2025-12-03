@@ -1,6 +1,12 @@
 import numpy as np
+from numba import njit
 
-
+@njit
+def _s_to_features(states, edges, features):
+    for d, edge in enumerate(edges):
+        features[:, d] = np.digitize(states[:, d], edge) - 1
+        features[:, d] = np.clip(features[:, d], 0, len(edge) - 2)
+    return features
 
 class Aggregator:
     def __init__(self, low, high, bins):
@@ -73,9 +79,11 @@ class Aggregator:
 
         # Vectorized discretization
         features = np.zeros_like(states, dtype=int)
-        for d, edge in enumerate(self.edges):
-            features[:, d] = np.digitize(states[:, d], edge) - 1
-            features[:, d] = np.clip(features[:, d], 0, len(edge) - 2)
+        # for d, edge in enumerate(self.edges):
+        #     features[:, d] = np.digitize(states[:, d], edge) - 1
+        #     features[:, d] = np.clip(features[:, d], 0, len(edge) - 2)
+
+        features = _s_to_features(states, self.edges, features)
         return features if N > 1 else features[0]
 
     # ---------------------------
@@ -220,7 +228,9 @@ class S_Reward:
         self.agg = agg
         self.reward_table = reward_table
 
-    def __call__(self, state, action, next_state):
+    def __call__(self, state, action, next_state, terminated):
+        if terminated:
+            return -1000
         return self.reward_table[tuple(self.agg.s_to_features(next_state))]
 
 
@@ -229,7 +239,9 @@ class SA_Reward:
         self.agg = agg
         self.reward_table = agg.flatten_sa_table(reward_table)
 
-    def __call__(self, state, action, next_state):
+    def __call__(self, state, action, next_state, terminated):
+        if terminated:
+            return -1000
         rew = self.reward_table[self.agg.sa_to_idx(state, action)]
         return rew
 
@@ -241,7 +253,9 @@ class SS_Reward:
         self.reward_table = s_agg.flatten_s_table(reward_table)
 
 
-    def __call__(self, state, action, next_state):
+    def __call__(self, state, action, next_state, terminated):
+        if terminated:
+            return -1000
         cur = self.agg.s_to_idx(state)
         next = self.agg.s_to_idx(next_state)
         return self.reward_table[next] - self.reward_table[cur]

@@ -61,7 +61,7 @@ def setup_env_exploring_starts(base_args):
     if base_args["env_name"] == "Acrobot-v1":
         return ESW(env, acrobot_state_sampler)
 
-def setup_agent(base_args, agent_args):
+def setup_agent(base_args, agent_args, max_rew = 0):
     if agent_args["policy"] == "Random":
         return get_random_agent(
             base_args["env_name"], base_args["a_bins"]
@@ -69,11 +69,11 @@ def setup_agent(base_args, agent_args):
         )
     if agent_args["policy"] == "Qlearning":
         return get_qlearning_agent(
-            base_args["env_name"], agent_args["gamma"], agent_args["lr"], a_bins = base_args["a_bins"]
+            base_args["env_name"], agent_args["gamma"], agent_args["lr"], a_bins = base_args["a_bins"], max_rew = max_rew
         )
     if agent_args["policy"] == "Reinforce":
         return get_reinforce_agent(
-            base_args["env_name"], agent_args["gamma"], agent_args["lr"], bin_res = base_args["a_bins"]
+            base_args["env_name"], agent_args["gamma"], agent_args["lr"], a_bins = base_args["a_bins"]
         )
 
 
@@ -108,10 +108,11 @@ def collect_rollouts_from_options(env, base_args, option_args, options):
 
 
 def learn_policy(env, base_args, option_args, reward_fn, transitions=None):
-    option = setup_agent(base_args, option_args)
+    option = setup_agent(base_args, option_args, max_rew = np.max(reward_fn.reward_table))
     if transitions != None:
+
         option.learn_offline_policy(
-            transitions, option_args["offline_epochs"], reward_fn, verbose=  option_args["learning_args"]["verbose"]
+            transitions, option_args["offline_epochs"], reward_fn, verbose=option_args["learning_args"]["verbose"]
         )
 
     option.learn_policy(
@@ -182,16 +183,22 @@ def collect_run_sa_eigenoptions(base_args, option_args, node_num=0):
         top_eig = sa_agg.unflatten_sa_table(eigenvectors[:, 0])
         top_eig /= np.max(np.abs(top_eig))
 
+
         if np.dot(top_eig.flatten(), p_sa.flatten()) > 0:
             top_eig = -top_eig
         
+        print(eigenvalues)
+        plotting.plot_sa_heatmap(base_args["env_name"], top_eig, sa_agg, save_path=f"out/figs/{i}_topeig.png")
+        plotting.plot_sa_heatmap(base_args["env_name"], p_sa, sa_agg, save_path=f"out/figs/{i}_psa.png")
+        
+        
         reward = SA_Reward(sa_agg, top_eig)
         # learn an option
-        options.append(
-            learn_policy(
+        option_policy = learn_policy(
                 env, base_args, option_args, reward, epoch_rollouts[-1]["all_rollouts"]
             )
-        )
+        options.append(option_policy)
+
 
     # collect last epoch rollout
     epoch_rollouts.append(
@@ -349,8 +356,8 @@ def compute_stats_from_run(base_args, transitions):
 
 def run_exp_test(base_args, option_args, adv_args):
 
-    trajectories_codex, _ = collect_run_codex(base_args, option_args)
     trajectories_eo, _ = collect_run_sa_eigenoptions(base_args, option_args)
+    trajectories_codex, _ = collect_run_codex(base_args, option_args)
     trajectories_maxent, _ = collect_run_maxent(base_args, option_args)
 
 
@@ -380,6 +387,6 @@ def run_exp_test(base_args, option_args, adv_args):
 
 import experiments
 if __name__ == "__main__":
-    args = experiments.pendulum_default_qlearning(epochs=5, l1_online=1000, verbose=True)    
+    args = experiments.mountaincar_qlearning_easy(epochs=5, l1_online=5000, verbose=True)    
     
     run_exp_test(*args)

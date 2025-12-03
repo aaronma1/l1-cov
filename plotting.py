@@ -116,9 +116,8 @@ def plot_sa_heatmap(env_name, sa_table, sa_agg,title="sa heatmap", save_path=Non
     if env_name == "MountainCarContinuous-v0":
         plot_heatmap(sa_table.reshape(sa_agg.shape()[0], -1), "x coordinate", "velocity", title, save_path=save_path)
 
-    if env_name == "Pendulum-v1":
+    elif env_name == "Pendulum-v1":
         plot_sa_heatmap_pendulum(sa_table, sa_agg, save_path=save_path)
-        
 
     else:
         print(f"Plotting not supported for {env_name}")

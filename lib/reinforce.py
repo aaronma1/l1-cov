@@ -112,7 +112,7 @@ class ReinforcePolicy(nn.Module):
             action = self._select_action(last_state)
             state, reward, terminated, truncated, info = env.step(action)
             if reward_fn != None:
-                reward = reward_fn(last_state, action)
+                reward = reward_fn(last_state, action, state)
             self.rewards.append(reward)
             ep_reward += reward
 
@@ -125,11 +125,12 @@ class ReinforcePolicy(nn.Module):
 
 
 
-    def learn_policy(self, env, reward_fn, train_epochs=1000, T=1000):
+    def learn_policy(self, env, T, epochs, reward_fn = None, verbose=True, print_every=100, update_every=100):
 
         running_reward = 0
         running_loss = 0
-        for i_episode in range(train_epochs):
+        loss = 0
+        for i_episode in range(epochs):
             ep_reward = self.learn_policy_internal(env, reward_fn, T)
 
             running_reward = running_reward * (1-0.05) + ep_reward * 0.05
@@ -137,17 +138,17 @@ class ReinforcePolicy(nn.Module):
                 running_reward = ep_reward
             
 
-            if i_episode % 100 == 0:
+            if i_episode % 100 == 0 and i_episode != 0:
                 loss = self.update_policy()
             running_loss = running_loss * (1-.005) + loss*0.05
 
             gc.collect()
 
-            if (i_episode) % 100 == 0:
+            if (i_episode) % print_every == 0 and verbose:
                 print('Episode {}\tEpisode reward {:.2f}\tRunning reward: {:.2f}\tLoss: {:.2f}'.format(
                     i_episode, ep_reward, running_reward, running_loss))
     
-    def learn_offline_policy(self, rollouts, offline_epochs):
+    def learn_offline_policy(self, rollouts, reward_fn, offline_epochs, verbose=False):
         pass
 
 

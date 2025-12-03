@@ -269,7 +269,7 @@ def collect_rollouts(env, agent, T, num_rollouts, reward_fn = None, epsilon=0.0)
             action = agent.select_action(last_state, epsilon)
             state, reward, terminated, truncated, info = env.step(action)
             if reward_fn != None:
-                reward = reward_fn(last_state, action, state)
+                reward = reward_fn(last_state, action, state, terminated)
             trajectory.add_transition(last_state, action, reward, state, terminated)
             last_state = state
             if terminated or truncated:

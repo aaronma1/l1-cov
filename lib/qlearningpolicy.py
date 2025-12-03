@@ -53,10 +53,10 @@ class TileCoder:
 
 class QLearningAgent:
 
-    def __init__(self, tilecoder, action_coder, gamma, lr):
+    def __init__(self, tilecoder, action_coder, gamma, lr, max_rew=0):
         self.stc =  tilecoder
         self.atc = action_coder
-        self.Q_w = np.ones(shape=action_coder.feature_shape() + tilecoder.feature_shape() ) * 1/(1-gamma)
+        self.Q_w = np.ones(shape=action_coder.feature_shape() + tilecoder.feature_shape() ) * max_rew * 1/(1-gamma)
         self.gamma = gamma
         self.lr = lr/(self.stc.num_tilings())
         # all possible actions
@@ -98,7 +98,7 @@ class QLearningAgent:
             # take a step
             state, reward, terminated, truncated, info = env.step(action)
             if reward_fn != None:
-                reward = reward_fn(last_state, action, state)
+                reward = reward_fn(last_state, action, state, terminated)
             ep_reward += reward
             state_features = self.stc.tile_state(state)
             # compute td target and update Q
@@ -136,7 +136,7 @@ class QLearningAgent:
             if i % decay_every == 0:
                 self.epsilon *= epsilon_decay
             # print if debuging
-            if verbose and i % print_every == 0:
+            if verbose and (i+1) % print_every == 0:
                 # print("ep reward", ep_reward, terminated, self.epsilon, np.max(self.Q_w), np.min(self.Q_w))
                 print(f"epoch {i} running reward: {running_reward}, ep_reward: {ep_reward} terminated: {terminated}, epsilon: {self.epsilon} max_q: {np.max(self.Q_w)}, min_q: {np.min(self.Q_w)}")
 
@@ -158,7 +158,7 @@ class QLearningAgent:
                 s_prime_tiles[t] = self.stc.tile_state(s_prime[t])
                 a_idx[t] = self.atc.idx_from_act(a[t])
                 if reward_fn != None:
-                    r[t] = reward_fn(s[t], a[t], s_prime[t])
+                    r[t] = reward_fn(s[t], a[t], s_prime[t], trajectory.terminated and (t == s.shape[0]-1))
             
             trajectory_tiles.append((s_tiles, a_idx, r, s_prime_tiles, trajectory.terminated))
 
@@ -228,7 +228,7 @@ class QLearningAgent:
 
         plot_heatmap(Q_sa_table.reshape(12, -1), save_path=save_path)
 
-def get_qlearning_agent(env_name, gamma, lr, a_bins = None):
+def get_qlearning_agent(env_name, gamma, lr, a_bins = None, max_rew=0):
     if env_name == "MountainCarContinuous-v0":
         mctc = TileCoder([-1.2, -0.07],[0.6, 0.07], num_tilings=16, num_tiles=8)
 
@@ -236,19 +236,19 @@ def get_qlearning_agent(env_name, gamma, lr, a_bins = None):
             a_bins = [3]
 
         mcac = AggregatingActionCoder(-1.0, 1.0, num_bins=a_bins[0])
-        return QLearningAgent(mctc,mcac, gamma,lr )
+        return QLearningAgent(mctc,mcac, gamma,lr ,max_rew=max_rew)
 
     if env_name == "Pendulum-v1":
         pdtc = TileCoder(low=[-1.0, -1.0, -8.0], high=[1.0,1.0,8.0], num_tilings=32, num_tiles=8)
         if a_bins == None:
             a_bins = [11]
         pdac = AggregatingActionCoder(-2.0, 2.0, num_bins=a_bins[0])
-        return QLearningAgent(pdtc, pdac, gamma=gamma, lr=lr)
+        return QLearningAgent(pdtc, pdac, gamma=gamma, lr=lr, max_rew=max_rew)
 
     if env_name == "CartPole-v1":
         cptc = TileCoder(low=[-2.5, -3.5, -0.3, -4.0], high=[2.5,3.5, 0.3, 4.0],num_tilings=32, num_tiles=16) 
         cpac = DiscreteActionCoder(2)
-        return QLearningAgent(cptc, cpac, gamma=gamma, lr=lr)
+        return QLearningAgent(cptc, cpac, gamma=gamma, lr=lr, max_rew=max_rew)
 
     
     if env_name == "Acrobot-v1":
@@ -256,7 +256,7 @@ def get_qlearning_agent(env_name, gamma, lr, a_bins = None):
         state_high = [1.0, 1.0, 1.0, 1.0, 13, 28.5]
         actc = TileCoder(state_low, state_high, 64, 8) 
         acac = DiscreteActionCoder(3)
-        return QLearningAgent(actc, acac, gamma=gamma, lr=lr)
+        return QLearningAgent(actc, acac, gamma=gamma, lr=lr, max_rew=max_rew)
 
     assert False, f"unknown env name {env_name}"
 

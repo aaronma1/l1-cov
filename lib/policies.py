@@ -71,10 +71,18 @@ class RandomAgent:
 
 
 # TODO change random agent to use action coders
-def get_random_agent(env_name):
+def get_random_agent(env_name, a_bins=None):
     if env_name == "MountainCarContinuous-v0":
-        mcac = AggregatingActionCoder(-1.0, 1.0, num_bins=3)
+        if a_bins == None:
+            a_bins = [3]
+
+        mcac = AggregatingActionCoder(-1.0, 1.0, num_bins=a_bins[0])
         return RandomAgent(mcac)
+    if env_name == "Pendulum-v1":
+        if a_bins == None:
+            a_bins = [11]
+        pdac = AggregatingActionCoder(-2.0, 2.0, num_bins=a_bins[0])
+        return RandomAgent(pdac)
 
     if env_name == "CartPole-v1":
         return RandomAgent(DiscreteActionCoder(2))
@@ -82,12 +90,6 @@ def get_random_agent(env_name):
     if env_name == "Acrobot-v1":
         return RandomAgent(DiscreteActionCoder(3))
 
-    if env_name == "Pendulum-v1":
-        pdac = AggregatingActionCoder(-2.0, 2.0, num_bins=11)
-        return RandomAgent(pdac)
-
-
-    
     assert False, f"Unknown env name {env_name}"
 
 if __name__ == "__main__":

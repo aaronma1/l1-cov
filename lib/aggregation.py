@@ -262,40 +262,31 @@ class SAS_Reward:
         next = self.reward_table[self.agg.sa_to_idx(next_state, next_actions)]
         return self.reduce_fn(next) - cur
 
-def get_aggregator(env_name, bin_res=1):
+def get_aggregator(env_name, s_bins, a_bins):
     if env_name == "MountainCarContinuous-v0":
         s_low = [-1.2, -0.07]
         s_high = [0.6, 0.07]
-        s_bins = [12 * bin_res, 11 * bin_res]
-        # s_bins = [4, 4]
         a_low = [-1.0]
         a_high = [1.0]
-        a_bins = [3 * bin_res]
         return Aggregator(s_low, s_high, s_bins), SA_Aggregator(
             s_low, s_high, s_bins, a_low, a_high, a_bins
-        )
-
-    if env_name == "CartPole-v1":
-        s_low = [-2.5, -3.5, -0.3, -4.0]
-        s_high = [2.5, 3.5, 0.3, 4.0]
-        s_bins = [12, 12, 5, 12]
-        num_actions = 2
-
-        return Aggregator(s_low, s_high, s_bins), SA_Aggregator_Disc(
-            s_low, s_high, s_bins, num_actions
         )
 
     if env_name == "Pendulum-v1":
         s_low = [-1.0, -1.0, -8.0]
         s_high = [1.0, 1.0, 8.0]
-        a_low = [-2.0]
-        a_high= [2.0]
-        s_bins = [8,8,8]
-        act_bins = [3]
         act_high = [2.0]
         act_low = [-2.0]
         return Aggregator(s_low, s_high, s_bins), SA_Aggregator(
-            s_low, s_high, s_bins, act_high, act_low, act_bins
+            s_low, s_high, s_bins, act_high, act_low, a_bins
+        )
+
+    if env_name == "CartPole-v1":
+        s_low = [-2.5, -3.5, -0.3, -4.0]
+        s_high = [2.5, 3.5, 0.3, 4.0]
+        num_actions = 2
+        return Aggregator(s_low, s_high, s_bins), SA_Aggregator_Disc(
+            s_low, s_high, s_bins, num_actions
         )
 
     if env_name == "AcroBot-v1":
@@ -303,7 +294,7 @@ def get_aggregator(env_name, bin_res=1):
         s_high = [1, 1, 1, 1, -12.6, -28.6]
         s_bins = [12, 12, 5, 12]
         num_actions = 3
-        return Aggregator(s_low, s_high, s_bins), SA_Aggregator_Disc(s_low, s_high, s_bins, num_actions)
+        return Aggregator(s_low, s_high, s_bins), SA_Aggregator_Disc(s_low, s_high, s_bins, a_bins)
 
 
 

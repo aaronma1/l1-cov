@@ -25,9 +25,11 @@ import numpy as np
 
 def setup_env(base_args):
     env = gym.make(base_args["env_name"], render_mode="rgb_array")
-    s_agg, sa_agg = get_aggregator(base_args["env_name"], bin_res=1)
+    s_agg, sa_agg = get_aggregator(base_args["env_name"], base_args["s_bins"], base_args["a_bins"])
     return env, s_agg, sa_agg
 
+def setup_aggregator(base_args):
+    return get_aggregator(base_args["env_name"], base_args["s_bins"], base_args["a_bins"])
 
 def setup_env_exploring_starts(base_args):
     env = gym.make(base_args["env_name"], render_mode="rgb_array")
@@ -60,15 +62,18 @@ def setup_env_exploring_starts(base_args):
         return ESW(env, acrobot_state_sampler)
 
 def setup_agent(base_args, agent_args):
-    # if agent_args["policy"] == "PolicyGrad":
-    #     pass
+    if agent_args["policy"] == "Random":
+        return get_random_agent(
+            base_args["env_name"], base_args["a_bins"]
+
+        )
     if agent_args["policy"] == "Qlearning":
         return get_qlearning_agent(
-            base_args["env_name"], agent_args["gamma"], agent_args["lr"]
+            base_args["env_name"], agent_args["gamma"], agent_args["lr"], a_bins = base_args["a_bins"]
         )
     if agent_args["policy"] == "Reinforce":
         return get_reinforce_agent(
-            base_args["env_name"], agent_args["gamma"], agent_args["lr"]
+            base_args["env_name"], agent_args["gamma"], agent_args["lr"], bin_res = base_args["a_bins"]
         )
 
 
@@ -104,12 +109,10 @@ def collect_rollouts_from_options(env, base_args, option_args, options):
 
 def learn_policy(env, base_args, option_args, reward_fn, transitions=None):
     option = setup_agent(base_args, option_args)
-
     if transitions != None:
         option.learn_offline_policy(
             transitions, option_args["offline_epochs"], reward_fn, verbose=  option_args["learning_args"]["verbose"]
         )
-    _, sa_agg = get_aggregator(base_args["env_name"])
 
     option.learn_policy(
         env,
@@ -124,20 +127,19 @@ def learn_policy(env, base_args, option_args, reward_fn, transitions=None):
 #           Rollout Collection
 ###########################################
 
+def eig_sparse(SR, k=131):
+    SR = (SR + SR.T) / 2.0
+
+    eigenvalues, eigenvectors = eigsh(SR, sigma=None, k=k, which="LM")
+    idx = np.argsort(-eigenvalues.real)
+    eigenvalues = np.real_if_close(eigenvalues, tol=1e5)[idx]
+    eigenvectors = np.real_if_close(eigenvectors, tol=1e5)[:, idx]
+    return eigenvectors, eigenvalues
+
 def collect_run_eigenoptions(base_args, option_args):
-    def eig_sparse(SR, k=131):
-        SR = (SR + SR.T) / 2.0
+    env, s_agg, _ = setup_env(base_args)
 
-        eigenvalues, eigenvectors = eigsh(SR, sigma=None, k=k, which="LM")
-        idx = np.argsort(-eigenvalues.real)
-        eigenvalues = np.real_if_close(eigenvalues, tol=1e5)[idx]
-        eigenvectors = np.real_if_close(eigenvectors, tol=1e5)[:, idx]
-        return eigenvectors, eigenvalues
-
-    s_agg, _ = get_aggregator(base_args["env_name"], bin_res=base_args["bin_res"])
-    env = gym.make(base_args["env_name"], render_mode="rgb_array")
-
-    options = [get_random_agent(base_args["env_name"])]
+    options = [setup_agent(base_args, {"policy":"Random"})]
     epoch_rollouts = []
 
     for i in range(base_args["num_epochs"]):
@@ -165,18 +167,9 @@ def collect_run_eigenoptions(base_args, option_args):
     return epoch_rollouts, options
 
 def collect_run_sa_eigenoptions(base_args, option_args, node_num=0):
-    def eig_sparse(SR, k=131):
-        SR = (SR + SR.T) / 2.0
-        eigenvalues, eigenvectors = eigsh(SR, sigma=None, k=k, which="LM")
-        idx = np.argsort(-eigenvalues.real)
-        eigenvalues = np.real_if_close(eigenvalues, tol=1e5)[idx]
-        eigenvectors = np.real_if_close(eigenvectors, tol=1e5)[:, idx]
-        return eigenvectors, eigenvalues
 
-    s_agg, sa_agg = get_aggregator(base_args["env_name"], bin_res=base_args["bin_res"])
-    env = gym.make(base_args["env_name"], render_mode="rgb_array")
-
-    options = [get_random_agent(base_args["env_name"])]
+    env, s_agg, sa_agg = setup_env(base_args)
+    options = [setup_agent(base_args, {"policy":"Random"})]
     epoch_rollouts = []
 
     for i in range(base_args["num_epochs"]):
@@ -208,11 +201,9 @@ def collect_run_sa_eigenoptions(base_args, option_args, node_num=0):
 
 
 def collect_run_codex(base_args, option_args):
-    s_agg, sa_agg = get_aggregator(base_args["env_name"], bin_res=1)
-    env = gym.make(base_args["env_name"], render_mode="rgb_array")
-
-    options = [get_random_agent(base_args["env_name"])]
+    env, _, sa_agg = setup_env(base_args)
     epoch_rollouts = []
+    options = [setup_agent(base_args, {"policy":"Random"})]
     for i in range(base_args["num_epochs"]):
         epoch_rollouts.append(
             collect_rollouts_from_options(env, base_args, option_args, options)
@@ -244,10 +235,9 @@ def collect_run_maxent(base_args, option_args):
     def ent_reward(p_s):
         eps = np.sqrt(np.size(p_s))
         return 1/(p_s + eps)
-    s_agg, sa_agg = get_aggregator(base_args["env_name"], bin_res=1)
-    env = gym.make(base_args["env_name"], render_mode="rgb_array")
 
-    options = [get_random_agent(base_args["env_name"])]
+    env, s_agg, _ = setup_env(base_args)
+    options = [setup_agent(base_args, {"policy":"Random"})]
     epoch_rollouts = []
     for i in range(base_args["num_epochs"]):
         epoch_rollouts.append(
@@ -273,17 +263,15 @@ def collect_run_maxent(base_args, option_args):
     return epoch_rollouts, options
 
 def collect_run_random(base_args):
-    env = gym.make(base_args["env_name"], render_mode="rgb_array")
+    env, _, _ = setup_env(base_args)
 
-    options = [get_random_agent(env_name=base_args["env_name"])]
+    options = [setup_agent(base_args, {"policy":"Random"})]
     epoch_rollouts = []
-
     for i in range(base_args["num_epochs"]):
         epoch_rollouts.append(
             collect_rollouts_from_options(env, base_args, {"rollout_args": {}}, options)
         )
-        options += [get_random_agent(env_name=base_args["env_name"])]
-
+        options += [setup_agent(base_args, {"policy":"Random"})]
     epoch_rollouts.append(collect_rollouts_from_options(env, base_args, {"rollout_args": {}}, options))
     return epoch_rollouts, options
 
@@ -359,78 +347,23 @@ def compute_stats_from_run(base_args, transitions):
     return stats
 
 
-def exp_test_mountaincar():
-    base_args = {
-        "l1_eps": 1e-4,  # regularizer epsilon for
-        "bin_res": 1,
-        "env_name": "MountainCarContinuous-v0",
-        "env_T": 200,
-        "num_rollouts": 400,
-        "num_epochs": 3,
-    }
+def run_exp_test(base_args, option_args, adv_args):
 
-    option_args = {
-        "policy": "Qlearning",
-        "gamma":0.99,
-        "lr":0.01,
-        "online_epochs":1000,
-        "offline_epochs":15,
-
-
-        "learning_args": {
-            "epsilon_start": 0.1,
-            "epsilon_decay": 0.999,
-            "decay_every": 1,
-            "verbose": True,
-            "print_every": 100,
-        },
-        "rollout_args": {
-            "epsilon": 0.0,
-        }
-    }
-    # more comprehensive qlearning args for l1 coverage
-    Qlearning_args_l1 = {
-        # base_args = {
-        "policy": "Qlearning",
-        "gamma": 0.99,
-        "lr": 0.01,
-        "online_epochs": 10000,
-        "offline_epochs": 0,
-        "learning_args": {
-            "epsilon_start": 0.3,
-            "epsilon_decay": 0.999,
-            "decay_every": 1,
-            "verbose": True,
-            "print_every": 100,
-        },
-        "rollout_args": {
-            "epsilon": 0.0,
-        },
-        "print_every": 100,
-    }
-    # trajectories_eo, _ = collect_run_sa_eigenoptions(base_args, option_args)
-    # s_agg, sa_agg = get_aggregator(base_args["env_name"])
-    # for i in range(base_args["num_epochs"]):
-    #     plotting.plot_heatmap(p_sa_from_rollouts(trajectories_eo[i]["all_rollouts"], sa_agg).reshape(12, -1),save_path=f"out/figs/{i}_psa_eo.png")
-    # stats_eo = compute_stats_from_run(base_args, trajectories_eo)
-    # eo_l1_covs, _ = compute_l1_from_run(base_args, Qlearning_args_l1, trajectories_eo)
-    # print("EO l1 covs", eo_l1_covs)
-    # print("eo_stats", stats_eo)
-    # return
-    
-    trajectories_codex, _ = collect_run_random(base_args)
     trajectories_codex, _ = collect_run_codex(base_args, option_args)
     trajectories_eo, _ = collect_run_sa_eigenoptions(base_args, option_args)
     trajectories_maxent, _ = collect_run_maxent(base_args, option_args)
-    
-    s_agg, sa_agg = get_aggregator(base_args["env_name"])
+
+
+    _, s_agg, sa_agg = setup_env(base_args)
+
     for i in range(base_args["num_epochs"]):
-        plotting.plot_heatmap(p_sa_from_rollouts(trajectories_codex[i]["all_rollouts"], sa_agg).reshape(12, -1), save_path=f"out/figs/{i}_psa_cov.png")
-        plotting.plot_heatmap(p_sa_from_rollouts(trajectories_eo[i]["all_rollouts"], sa_agg).reshape(12, -1),save_path=f"out/figs/{i}_psa_eo.png")
-        plotting.plot_heatmap(p_sa_from_rollouts(trajectories_maxent[i]["all_rollouts"], sa_agg).reshape(12, -1),save_path=f"out/figs/{i}_psa_maxent.png")
-    codex_l1_covs, _ = compute_l1_from_run(base_args, Qlearning_args_l1, trajectories_codex)
-    eo_l1_covs, _ = compute_l1_from_run(base_args, Qlearning_args_l1, trajectories_eo)
-    maxent_l1_covs, _ = compute_l1_from_run(base_args, Qlearning_args_l1, trajectories_maxent)
+        plotting.plot_sa_heatmap(base_args["env_name"], p_sa_from_rollouts(trajectories_codex[i]["all_rollouts"], sa_agg), sa_agg, save_path=f"out/figs/{i}_psa_cov.png")
+        plotting.plot_sa_heatmap(base_args["env_name"], p_sa_from_rollouts(trajectories_eo[i]["all_rollouts"], sa_agg), sa_agg, save_path=f"out/figs/{i}_psa_eo.png")
+        plotting.plot_sa_heatmap(base_args["env_name"], p_sa_from_rollouts(trajectories_maxent[i]["all_rollouts"], sa_agg), sa_agg, save_path=f"out/figs/{i}_psa_maxent.png")
+
+    codex_l1_covs, _ = compute_l1_from_run(base_args, adv_args, trajectories_codex)
+    eo_l1_covs, _ = compute_l1_from_run(base_args, adv_args, trajectories_eo)
+    maxent_l1_covs, _ = compute_l1_from_run(base_args, adv_args, trajectories_maxent)
     print("codex l1 covs", codex_l1_covs)
     print("EO l1 covs", eo_l1_covs)
     print("Maxent l1 covs", maxent_l1_covs)
@@ -443,129 +376,10 @@ def exp_test_mountaincar():
     print("eo_stats", stats_eo)
     print("maxent_stats", stats_maxent)
 
-def exp_test_pendulum():
-    base_args = {
-        "l1_eps": 1e-4,  # regularizer epsilon for
-        "bin_res": 1,
-        "env_name": "Pendulum-v1",
-        "env_T": 400,
-        "num_rollouts": 800,
-        "num_epochs": 10,
-    }
-
-    Qlearning_args = {
-        "policy": "Qlearning",
-        "gamma": 0.99,
-        "lr": 0.01,
-        "online_epochs": 1000,
-        "offline_epochs": 10,
-        "learning_args": {
-            "epsilon_start": 0.1,
-            "epsilon_decay": 0.999,
-            "decay_every": 1,
-            "verbose": True,
-            "print_every": 100,
-        },
-        "rollout_args": {
-            "epsilon": 0.0,
-        },
-    }
-    # more comprehensive qlearning args for l1 coverage
-    Qlearning_args_l1 = {
-        # base_args = {
-        "policy": "Qlearning",
-        "gamma": 0.99,
-        "lr": 0.01,
-        "online_epochs": 10000,
-        "offline_epochs": 0,
-        "learning_args": {
-            "epsilon_start": 0.5,
-            "epsilon_decay": 0.999,
-            "decay_every": 3,
-            "verbose": True,
-            "print_every": 1000,
-        },
-        "rollout_args": {
-            "epsilon": 0.0,
-        },
-        "print_every": 100,
-    }
     
-    trajectories_eo, _ = collect_run_sa_eigenoptions(base_args, Qlearning_args)
-    trajectories_codex, _ = collect_run_codex(base_args, Qlearning_args)
-    trajectories_maxent, _ = collect_run_maxent(base_args, Qlearning_args)
-    
-    s_agg, sa_agg = get_aggregator(base_args["env_name"])
-    for i in range(base_args["num_epochs"]):
-        plotting.plot_sa_heatmap_pendulum(p_sa_from_rollouts(trajectories_codex[i]["all_rollouts"], sa_agg), sa_agg, save_path=f"out/figs/{i}_psa_cov.png")
-        plotting.plot_sa_heatmap_pendulum(p_sa_from_rollouts(trajectories_eo[i]["all_rollouts"], sa_agg), sa_agg, save_path=f"out/figs/{i}_psa_eo.png")
-        plotting.plot_sa_heatmap_pendulum(p_sa_from_rollouts(trajectories_maxent[i]["all_rollouts"], sa_agg), sa_agg,save_path=f"out/figs/{i}_psa_maxent.png")
-    codex_l1_covs, _ = compute_l1_from_run(base_args, Qlearning_args_l1, trajectories_codex)
-    eo_l1_covs, _ = compute_l1_from_run(base_args, Qlearning_args_l1, trajectories_eo)
-    maxent_l1_covs, _ = compute_l1_from_run(base_args, Qlearning_args_l1, trajectories_maxent)
-    print("codex l1 covs", codex_l1_covs)
-    print("EO l1 covs", eo_l1_covs)
-    print("Maxent l1 covs", maxent_l1_covs)
 
-def exp_test_cartpole():
-    base_args = {
-        "l1_eps": 1e-4,  # regularizer epsilon for
-        "bin_res": 1,
-        "env_name": "CartPole-v1",
-        "env_T": 400,
-        "num_rollouts": 400,
-        "num_epochs": 10,
-    }
-
-    Qlearning_args = {
-        "policy": "Qlearning",
-        "gamma": 0.99,
-        "lr": 0.01,
-        "online_epochs": 1000,
-        "offline_epochs": 10,
-        "learning_args": {
-            "epsilon_start": 0.1,
-            "epsilon_decay": 0.999,
-            "decay_every": 1,
-            "verbose": True,
-            "print_every": 100,
-        },
-        "rollout_args": {
-            "epsilon": 0.0,
-        },
-    }
-    # more comprehensive qlearning args for l1 coverage
-    Qlearning_args_l1 = {
-        # base_args = {
-        "policy": "Qlearning",
-        "gamma": 0.99,
-        "lr": 0.01,
-        "online_epochs": 10000,
-        "offline_epochs": 0,
-        "learning_args": {
-            "epsilon_start": 0.0,
-            "epsilon_decay": 0.999,
-            "decay_every": 3,
-            "verbose": False,
-            "print_every": 1000,
-        },
-        "rollout_args": {
-            "epsilon": 0.0,
-        },
-        "print_every": 100,
-    }
-    
-    trajectories_eo, _ = collect_run_sa_eigenoptions(base_args, Qlearning_args)
-    trajectories_codex, _ = collect_run_codex(base_args, Qlearning_args)
-    trajectories_maxent, _ = collect_run_maxent(base_args, Qlearning_args)
-    
-    codex_l1_covs, _ = compute_l1_from_run(base_args, Qlearning_args_l1, trajectories_codex)
-    eo_l1_covs, _ = compute_l1_from_run(base_args, Qlearning_args_l1, trajectories_eo)
-    maxent_l1_covs, _ = compute_l1_from_run(base_args, Qlearning_args_l1, trajectories_maxent)
-    print("codex l1 covs", codex_l1_covs)
-    print("EO l1 covs", eo_l1_covs)
-    print("Maxent l1 covs", maxent_l1_covs)
-
-
+import experiments
 if __name__ == "__main__":
-    exp_test_mountaincar()
+    args = experiments.pendulum_default_qlearning(epochs=5, l1_online=1000, verbose=True)    
+    
+    run_exp_test(*args)

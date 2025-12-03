@@ -228,21 +228,28 @@ class QLearningAgent:
 
         plot_heatmap(Q_sa_table.reshape(12, -1), save_path=save_path)
 
-def get_qlearning_agent(env_name, gamma, lr):
+def get_qlearning_agent(env_name, gamma, lr, a_bins = None):
     if env_name == "MountainCarContinuous-v0":
         mctc = TileCoder([-1.2, -0.07],[0.6, 0.07], num_tilings=16, num_tiles=8)
-        mcac = AggregatingActionCoder(-1.0, 1.0, num_bins=3)
+
+        if a_bins == None:
+            a_bins = [3]
+
+        mcac = AggregatingActionCoder(-1.0, 1.0, num_bins=a_bins[0])
         return QLearningAgent(mctc,mcac, gamma,lr )
+
+    if env_name == "Pendulum-v1":
+        pdtc = TileCoder(low=[-1.0, -1.0, -8.0], high=[1.0,1.0,8.0], num_tilings=32, num_tiles=8)
+        if a_bins == None:
+            a_bins = [11]
+        pdac = AggregatingActionCoder(-2.0, 2.0, num_bins=a_bins[0])
+        return QLearningAgent(pdtc, pdac, gamma=gamma, lr=lr)
 
     if env_name == "CartPole-v1":
         cptc = TileCoder(low=[-2.5, -3.5, -0.3, -4.0], high=[2.5,3.5, 0.3, 4.0],num_tilings=32, num_tiles=16) 
         cpac = DiscreteActionCoder(2)
         return QLearningAgent(cptc, cpac, gamma=gamma, lr=lr)
 
-    if env_name == "Pendulum-v1":
-        pdtc = TileCoder(low=[-1.0, -1.0, -8.0], high=[1.0,1.0,8.0], num_tilings=32, num_tiles=8)
-        pdac = AggregatingActionCoder(-2.0, 2.0, num_bins=21)
-        return QLearningAgent(pdtc, pdac, gamma=gamma, lr=lr)
     
     if env_name == "Acrobot-v1":
         state_low = [-1.0,-1.0, -1.0, -1.0, -13, -28.5]

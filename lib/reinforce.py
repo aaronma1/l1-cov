@@ -152,18 +152,22 @@ class ReinforcePolicy(nn.Module):
 
 
 
-def get_reinforce_agent(env_name, gamma, lr):
+def get_reinforce_agent(env_name, gamma, lr, a_bins=None):
     if env_name == "MountainCarContinuous-v0":
-        mcac = AggregatingActionCoder(-1.0, 1.0, num_bins=3)
+        if a_bins == None:
+            a_bins = [3]
+        mcac = AggregatingActionCoder(-1.0, 1.0, num_bins=a_bins[0])
         return ReinforcePolicy(gamma, lr, 2, mcac)
+
+    if env_name == "Pendulum-v1":
+        if a_bins == None:
+            a_bins = [11]
+        pdac = AggregatingActionCoder(-2.0, 2.0, num_bins=a_bins[0])
+        return ReinforcePolicy(gamma, lr, 3, pdac )
 
     if env_name == "CartPole-v1":
         cpac = DiscreteActionCoder(2)
         return ReinforcePolicy(gamma, lr, 4, cpac)
-
-    if env_name == "Pendulum-v1":
-        pdac = AggregatingActionCoder(-2.0, 2.0, num_bins=11)
-        return ReinforcePolicy(gamma, lr, 3, pdac )
     
     if env_name == "AcroBot-v1":
         acac = DiscreteActionCoder(3)

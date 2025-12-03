@@ -217,7 +217,6 @@ def run_experiments(base_args, option_args, adversery_args, N_RUNS, SAVE_DIR, MA
         "base_args": base_args, 
         "option_args":option_args,
         "adversery_args":adversery_args,
-
     }
     dump_pickle(params, os.path.join(SAVE_DIR, "params.pkl"))
 
@@ -260,143 +259,12 @@ def run_experiments(base_args, option_args, adversery_args, N_RUNS, SAVE_DIR, MA
 # Experiment Configurations
 #######################V##############
 
-def experiments_mountaincar(SAVE_DIR, MAX_WORKERS, N_RUNS, epochs=15):
-    base_args = {
-        "l1_eps":1e-4, # regularizer epsilon for 
-        "bin_res": 1,
-        "env_name": "MountainCarContinuous-v0",
-        "env_T":200,
-        "num_rollouts":400,
-        "num_epochs": epochs,
-        "reward_shaping_constant": -1
-    }
 
-    option_args = {
-        "policy": "Qlearning",
-        "gamma":0.99,
-        "lr":0.01,
-        "online_epochs":1000,
-        "offline_epochs":10,
-
-
-        "learning_args": {
-            "epsilon_start": 0.2,
-            "epsilon_decay": 0.999,
-            "decay_every": 1,
-            "verbose": False,
-            "print_every": 100,
-        },
-        "rollout_args": {
-            "epsilon": 0.0,
-        }
-    }
-
-    adversery_args = {
-        "policy": "Qlearning",
-        "gamma":0.99,
-        "lr":0.01,
-        "online_epochs":10000,
-        "offline_epochs":0,
-
-        "learning_args": {
-            "epsilon_start": 0.5,
-            "epsilon_decay": 0.999,
-            "decay_every": 2,
-            "verbose": False,
-            "print_every": 100,
-        },
-        "rollout_args": {
-            "epsilon": 0.0,
-        }
-    }
-    run_experiments(base_args, option_args, adversery_args, N_RUNS, SAVE_DIR, MAX_WORKERS)
-
-def experiments_pendulum(SAVE_DIR, N_RUNS, MAX_WORKERS, epochs=15):
-    base_args = {
-        "l1_eps": 1e-4,  # regularizer epsilon for
-        "bin_res": 1,
-        "env_name": "Pendulum-v1",
-        "env_T": 200,
-        "num_rollouts": 400,
-        "num_epochs": epochs,
-    }
-
-    option_args = {
-        "policy": "Qlearning",
-        "gamma": 0.99,
-        "lr": 0.01,
-        "online_epochs": 1000,
-        "offline_epochs": 10,
-        "learning_args": {
-            "epsilon_start": 0.5,
-            "epsilon_decay": 0.99,
-            "decay_every": 1,
-            "verbose": True,
-            "print_every": 100,
-        },
-        "rollout_args": {
-            "epsilon": 0.0,
-        },
-    }
-    adversery_args = {
-        # base_args = {
-        "policy": "Qlearning",
-        "gamma": 0.99,
-        "lr": 0.01,
-        "online_epochs": 20000,
-        "offline_epochs": 0,
-        "learning_args": {
-            "epsilon_start": 0.0,
-            "epsilon_decay": 0.999,
-            "decay_every": 0,
-            "verbose": True,
-            "print_every": 1000,
-        },
-        "rollout_args": {
-            "epsilon": 0.0,
-        },
-        "print_every": 100,
-    }
-    run_experiments(base_args, option_args, adversery_args, N_RUNS, SAVE_DIR, MAX_WORKERS)
-
-
-def parse_args():
-    parser = argparse.ArgumentParser(description="Job runner configuration")
-
-    parser.add_argument(
-        "--max_workers",
-        type=int,
-        required=True,
-        help="Number of worker processes to spawn"
-    )
-
-    parser.add_argument(
-        "--n_runs",
-        type=int,
-        required=True,
-        help="Total number of jobs to run"
-    )
-
-    parser.add_argument(
-        "--epochs",
-        type=int,
-        default=15,
-        help="Number of epochs to run (default: 1)"
-    )
-    parser.add_argument(
-        "--save_path",
-        type=str,
-        default="out",
-        help="Save path"
-    )
-
-
-    return parser.parse_args()
-
+import experiments
 if __name__ == "__main__":
-
-    args = parse_args()
     # multiprocessing.set_start_method("spawn", force=True) 
+    args = experiments.mountaincar_qlearning_hard(epochs=15, l1_online=10000)
+    run_experiments(*args)
+    
 
     
-    experiments_mountaincar(SAVE_DIR=args.save_path, N_RUNS=args.n_runs,MAX_WORKERS=args.max_workers, epochs=args.epochs)

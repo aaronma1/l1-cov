@@ -88,21 +88,6 @@ def compute_policy_state_entropy(base_args, rollouts):
         state_entropy.append(entropy(p_s.flatten()))
     return state_entropy
 
-        
-
-
-def gen_heatmap_epoch(rollouts, base_args, save_dir="out"):
-    s_agg, _ = get_aggregator(base_args["env_name"], bin_res=base_args["bin_res"])
-
-    for i, epoch in enumerate(rollouts):
-
-        P_S = p_s_from_rollouts(epoch, s_agg)
-        SR = sr_from_rollouts(epoch, s_agg)
-
-        plot_heatmap(P_S, save_path=f"{save_dir}/epoch{i}_mu_s")
-        plot_heatmap(SR, save_path=f"{save_dir}/epoch{i}_sr")
-
-
 
 def plot_sa_heatmap_pendulum(sa_heatmap, sa_agg, save_path=None):
     state_shape = 2*sa_agg.state_shape()
@@ -123,7 +108,23 @@ def plot_sa_heatmap_pendulum(sa_heatmap, sa_agg, save_path=None):
                 heatmap[i][j][a] = sa_heatmap[tuple(sa_agg.sa_to_features(state,a))]
     
     # plot_heatmap(heatmap.sum(axis=-1),save_path=save_path)
-    plot_heatmap(heatmap.reshape(bins_theta, -1), xlabel="theta, [-2pi, 2pi]", ylabel="v, [-8, 8]",save_path=save_path)
+    plot_heatmap(heatmap.reshape(bins_theta, -1), xlabel="theta, [0, 2pi]", ylabel="v, [-8, 8]",save_path=save_path)
+
+
+def plot_sa_heatmap(env_name, sa_table, sa_agg,title="sa heatmap", save_path=None):
+
+    if env_name == "MountainCarContinuous-v0":
+        plot_heatmap(sa_table.reshape(sa_agg.shape()[0], -1), "x coordinate", "velocity", title, save_path=save_path)
+
+    if env_name == "Pendulum-v1":
+        plot_sa_heatmap_pendulum(sa_table, sa_agg, save_path=save_path)
+        
+
+    else:
+        print(f"Plotting not supported for {env_name}")
+        return 
+
+
 
 
 import gymnasium as gym

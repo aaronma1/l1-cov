@@ -164,7 +164,7 @@ def get_reinforce_agent(env_name, gamma, lr, a_bins=None):
         return ReinforcePolicy(gamma, lr, 2, mcac)
 
     if env_name == "Pendulum-v1":
-        _, _, a_low, a_high = environments.mountaincar_bounds()
+        _, _, a_low, a_high = environments.pendulum_bounds()
         if a_bins == None:
             a_bins = [11]
         pdac = AggregatingActionCoder(a_low, a_high, num_bins=a_bins[0])

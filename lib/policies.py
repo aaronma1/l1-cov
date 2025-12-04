@@ -80,7 +80,6 @@ def get_random_agent(env_name, a_bins=None):
         mcac = AggregatingActionCoder(a_low, a_high, num_bins=a_bins)
         return RandomAgent(mcac)
     if env_name == "Pendulum-v1":
-
         _, _, a_low, a_high = environments.pendulum_bounds()
         if a_bins == None:
             a_bins = [11]

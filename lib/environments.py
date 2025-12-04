@@ -19,8 +19,8 @@ def pendulum_bounds():
     return s_low, s_high, a_low, a_high
 
 def cartpole_bounds():
-    s_low = [-2.5, -3.5, -0.3, -4.0]
-    s_high=[2.5,3.5, 0.3, 4.0]
+    s_low = [-2.5, -3.5, -0.21, -4.0]
+    s_high=[2.5,3.5, 0.21, 4.0]
 
     return s_low, s_high
 

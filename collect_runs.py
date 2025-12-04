@@ -61,7 +61,7 @@ def setup_env_exploring_starts(base_args):
     if base_args["env_name"] == "Acrobot-v1":
         return ESW(env, acrobot_state_sampler)
 
-def setup_agent(base_args, agent_args, max_rew = 0):
+def setup_agent(base_args, agent_args, max_rew = 1):
     if agent_args["policy"] == "Random":
         return get_random_agent(
             base_args["env_name"], base_args["a_bins"]
@@ -172,7 +172,7 @@ def collect_run_sa_eigenoptions(base_args, option_args, node_num=0):
     options = [setup_agent(base_args, {"policy":"Random"})]
     epoch_rollouts = []
 
-    for i in range(base_args["num_epochs"]):
+    for _ in range(base_args["num_epochs"]):
         epoch_rollouts.append(
             collect_rollouts_from_options(env, base_args, option_args, options)
         )
@@ -185,7 +185,7 @@ def collect_run_sa_eigenoptions(base_args, option_args, node_num=0):
         if np.dot(top_eig.flatten(), p_sa.flatten()) > 0:
             top_eig = -top_eig
 
-        reward = SA_Reward(sa_agg, top_eig, termination_rew=-2)
+        reward = SA_Reward(sa_agg, top_eig, termination_rew=-200)
         # learn an option
         option_policy = learn_policy(
                 env, base_args, option_args, reward, epoch_rollouts[-1]["all_rollouts"]
@@ -291,13 +291,13 @@ def compute_l1_from_run(base_args, adv_args, run):
         uniform_density_sa = np.ones(sa_agg.shape())
         l1_cov_reward = 1 / (base_args["l1_eps"] * uniform_density_sa + p_sa)
         reward_fn = SA_Reward(
-            sa_agg, reward_shaping(l1_cov_reward) 
+            sa_agg, reward_shaping(l1_cov_reward), termination_rew=0
         )
         adv_policy = setup_agent(base_args, adv_args)
         adv_policy.learn_policy(
             learn_env,
             base_args["env_T"],
-            adv_args["online_epochs"],
+            adv_args["offline_epochs"],
             reward_fn,
             **adv_args["learning_args"],
         )
@@ -320,6 +320,7 @@ def compute_l1_from_run(base_args, adv_args, run):
         p_sa = p_sa_from_rollouts(rollouts, sa_agg)
         l1_covs.append(average_reward_from_rollouts(rollouts))
         adv_policies.append(adv_policy)
+        plotting.plot_sa_heatmap(base_args["env_name"], p_sa, sa_agg, save_path=f"out/figs/{i}_adv_psa.png")
     return l1_covs, adv_policies
 
 
@@ -356,7 +357,7 @@ def run_exp_test(base_args, option_args, adv_args):
 
     _, s_agg, sa_agg = setup_env(base_args)
 
-    for i in range(base_args["num_epochs"]):
+    for i in range(base_args["num_epochs"]+1):
         plotting.plot_sa_heatmap(base_args["env_name"], p_sa_from_rollouts(trajectories_codex[i]["all_rollouts"], sa_agg), sa_agg, save_path=f"out/figs/{i}_psa_cov.png")
         plotting.plot_sa_heatmap(base_args["env_name"], p_sa_from_rollouts(trajectories_eo[i]["all_rollouts"], sa_agg), sa_agg, save_path=f"out/figs/{i}_psa_eo.png")
         plotting.plot_sa_heatmap(base_args["env_name"], p_sa_from_rollouts(trajectories_maxent[i]["all_rollouts"], sa_agg), sa_agg, save_path=f"out/figs/{i}_psa_maxent.png")
@@ -380,5 +381,5 @@ def run_exp_test(base_args, option_args, adv_args):
 
 import experiments
 if __name__ == "__main__":
-    args = experiments.pendulum_default(epochs=3, l1_online=1000, verbose=True)    
+    args = experiments.pendulum_default_qlearning(epochs=1, l1_online=1000, verbose=True)    
     run_exp_test(*args)

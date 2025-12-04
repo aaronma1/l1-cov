@@ -263,8 +263,8 @@ def run_experiments(base_args, option_args, adversery_args, N_RUNS, SAVE_DIR, MA
 import experiments
 if __name__ == "__main__":
     # multiprocessing.set_start_method("spawn", force=True) 
-    args = experiments.mountaincar_qlearning_hard(epochs=15, l1_online=10000)
-    run_experiments(*args)
+    args = experiments.pendulum_default_qlearning(epochs=1, l1_online=10000)
+    run_experiments(*args, N_RUNS=4, MAX_WORKERS=4, SAVE_DIR="out/pendulum2")
     
 
     

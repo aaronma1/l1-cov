@@ -103,11 +103,11 @@ def mountaincar_qlearning_hard(epochs=15, l1_online=5000, verbose=False):
 def pendulum_default_qlearning(epochs=15, l1_online=5000, verbose=False):
     base_args = {
         "l1_eps": 1e-4,  # regularizer epsilon for
-        "s_bins": [8,8,8], 
-        "a_bins": [7],
+        "s_bins": [10, 10, 10], 
+        "a_bins": [11],
         "env_name": "Pendulum-v1",
         "env_T": 200,
-        "num_rollouts": 100,
+        "num_rollouts": 400,
         "num_epochs": epochs,
     }
         
@@ -136,7 +136,7 @@ def pendulum_default_qlearning(epochs=15, l1_online=5000, verbose=False):
         "online_epochs": l1_online,
         "offline_epochs": 0,
         "learning_args": {
-            "epsilon_start": 0.5,
+            "epsilon_start": 0.0,
             "epsilon_decay": 0.999,
             "decay_every": 1,
             "verbose": verbose,
@@ -157,7 +157,7 @@ def pendulum_default(epochs=15, l1_online=5000, verbose=False):
         "a_bins": [3],
         "env_name": "Pendulum-v1",
         "env_T": 200,
-        "num_rollouts": 200,
+        "num_rollouts": 400,
         "num_epochs": epochs,
     }
         
@@ -189,7 +189,7 @@ def pendulum_default(epochs=15, l1_online=5000, verbose=False):
             "print_every": 100,
         },
         "rollout_args": {
-            "epsilon": 0.1,
+            "epsilon": 0.0,
         },
     }
 
@@ -198,9 +198,9 @@ def pendulum_default(epochs=15, l1_online=5000, verbose=False):
 def cartpole_default(epochs=15, l1_online=5000, verbose=False):
     base_args = {
         "l1_eps": 1e-4,  # regularizer epsilon for
-        "s_bins": [8,8,8, 16], 
-        "a_bins": [7],
-        "env_name": "Cartpole-v1",
+        "s_bins": [8,8,10,8], 
+        "a_bins": None,
+        "env_name": "CartPole-v1",
         "env_T": 200,
         "num_rollouts": 300,
         "num_epochs": epochs,
@@ -210,7 +210,7 @@ def cartpole_default(epochs=15, l1_online=5000, verbose=False):
         "policy": "Qlearning",
         "gamma":0.99,
         "lr":0.01,
-        "online_epochs":0,
+        "online_epochs":2000,
         "offline_epochs":15,
         "learning_args": {
             "epsilon_start": 0.1,
@@ -220,7 +220,7 @@ def cartpole_default(epochs=15, l1_online=5000, verbose=False):
             "print_every": 100,
         },
         "rollout_args": {
-            "epsilon": 0.1,
+            "epsilon": 0.0,
         }
     }
     # more comprehensive qlearning args for l1 coverage
@@ -231,14 +231,14 @@ def cartpole_default(epochs=15, l1_online=5000, verbose=False):
         "online_epochs": l1_online,
         "offline_epochs": 0,
         "learning_args": {
-            "epsilon_start": 0.3,
+            "epsilon_start": 0.01,
             "epsilon_decay": 0.999,
-            "decay_every": 1,
+            "decay_every": 5,
             "verbose": verbose,
             "print_every": 100,
         },
         "rollout_args": {
-            "epsilon": 0.1,
+            "epsilon": 0.0,
         },
         "print_every": 100,
     }

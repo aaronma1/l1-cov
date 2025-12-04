@@ -5,7 +5,7 @@ import lib.tiles3 as tc
 import lib.environments as environments
 
 from lib.policies import AggregatingActionCoder, DiscreteActionCoder
-
+import random
 # Q-learning agent
 class TileCoder:
     def __init__(self, low, high, num_tilings, num_tiles):
@@ -54,7 +54,7 @@ class TileCoder:
 
 class QLearningAgent:
 
-    def __init__(self, tilecoder, action_coder, gamma, lr, max_rew=0):
+    def __init__(self, tilecoder, action_coder, gamma, lr, max_rew=1):
         self.stc =  tilecoder
         self.atc = action_coder
         self.Q_w = np.ones(shape=action_coder.feature_shape() + tilecoder.feature_shape() ) * max_rew * 1/(1-gamma)
@@ -162,6 +162,7 @@ class QLearningAgent:
                     r[t] = reward_fn(s[t], a[t], s_prime[t], trajectory.terminated and (t == s.shape[0]-1))
             
             trajectory_tiles.append((s_tiles, a_idx, r, s_prime_tiles, trajectory.terminated))
+        random.shuffle(trajectory_tiles)
 
         @njit
         def _internal(Q, trajectory_tiles, offline_epochs, lr, gamma):
@@ -187,7 +188,8 @@ class QLearningAgent:
             print(f"average reward for offline learning {avg_reward}")
         
 
-def get_qlearning_agent(env_name, gamma, lr, a_bins = None, max_rew=0):
+def get_qlearning_agent(env_name, gamma, lr, a_bins = None, max_rew=1):
+    print(max_rew)
     if env_name == "MountainCarContinuous-v0":
 
         state_low, state_high, act_low, act_high = environments.mountaincar_bounds()
@@ -199,7 +201,7 @@ def get_qlearning_agent(env_name, gamma, lr, a_bins = None, max_rew=0):
 
     if env_name == "Pendulum-v1":
         state_low, state_high, act_low, act_high = environments.pendulum_bounds()
-        pdtc = TileCoder(low=state_low, high=state_high, num_tilings=32, num_tiles=8)
+        pdtc = TileCoder(low=state_low, high=state_high, num_tilings=32, num_tiles=4)
         if a_bins == None:
             a_bins = [3]
         pdac = AggregatingActionCoder(act_low, act_high, num_bins=a_bins)
@@ -207,7 +209,7 @@ def get_qlearning_agent(env_name, gamma, lr, a_bins = None, max_rew=0):
 
     if env_name == "CartPole-v1":
         state_low, state_high = environments.cartpole_bounds()
-        cptc = TileCoder(low=state_low, high=state_high,num_tilings=32, num_tiles=16) 
+        cptc = TileCoder(low=state_low, high=state_high,num_tilings=32, num_tiles=4) 
         cpac = DiscreteActionCoder(2)
         return QLearningAgent(cptc, cpac, gamma=gamma, lr=lr, max_rew=max_rew)
 

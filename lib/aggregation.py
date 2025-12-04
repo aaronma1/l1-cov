@@ -129,18 +129,18 @@ class SA_Aggregator_Disc:
         states = np.atleast_2d(states)
         actions = np.atleast_1d(actions)
 
-        state_features = self.agg_internal.state_to_idx(states)
+        state_features = self.agg_internal.s_to_idx(states)
 
         if return_int:
-            return (state_features + actions * self.agg_internal.num_states())[0]
-        return state_features + actions * self.agg_internal.num_states()
+            return (state_features + actions * self.agg_internal.num_states()).astype(np.int32)[0]
+        return (state_features + actions * self.agg_internal.num_states()).astype(np.int32)
 
     def sa_to_features(self, states, actions):
         return_int = np.isscalar(actions)
 
         actions = np.atleast_2d(actions).T
         state_features = np.atleast_2d(self.agg_internal.s_to_features(states))
-        ret = np.concatenate([state_features, actions], axis=-1)
+        ret = np.concatenate([state_features, actions], axis=-1).astype(np.int32)
 
         if return_int:
             return ret[0]
@@ -154,7 +154,7 @@ class SA_Aggregator_Disc:
         actions = idxs // self.agg_internal.num_states()
 
         return np.concatenate(
-            [self.agg_internal.idx_to_features(states), actions], axis=-1
+            [self.agg_internal.idx_to_features(states), actions], axis=-1, dtype=np.int32
         )
 
 
@@ -173,6 +173,8 @@ class SA_Aggregator_Disc:
     def unflatten_sa_table(self, sa_table):
         return sa_table.reshape(self.shape(), order="F")
 
+    def state_shape(self):
+        return self.state_bins
     
   
 

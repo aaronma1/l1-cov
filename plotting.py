@@ -88,40 +88,126 @@ def compute_policy_state_entropy(base_args, rollouts):
         state_entropy.append(entropy(p_s.flatten()))
     return state_entropy
 
-
 def plot_sa_heatmap_pendulum(sa_heatmap, sa_agg, save_path=None):
-    state_shape = 2*sa_agg.state_shape()
-    bins_theta = 2*sa_agg.state_shape()[0] 
-    bins_v = sa_agg.state_shape()[2]
-    theta_samples = np.linspace(0, 2*np.pi, num=bins_theta)
-    v_samples = np.linspace(-8, 8, num = state_shape[2])
+    # state_shape likely something like (cos, sin, velocity)
+    S = sa_agg.state_shape()   # e.g. (n_cos, n_sin, n_v)
 
-    heatmap = np.zeros((bins_theta, state_shape[2], sa_agg.num_a()))
+    # Define bins
+    bins_theta = S[0] * 2   # since cos,sin discretizations wrap
+    bins_v = S[2]           # velocity bins
 
+    # Sample angles + velocities
+    theta_samples = np.linspace(0, 2*np.pi, bins_theta, endpoint=False)
+    v_samples = np.linspace(-8, 8, bins_v)
 
+    # Initialize arrays
+    num_a = sa_agg.num_a()
+    heatmap = np.zeros((bins_theta, bins_v, num_a))
+    counts  = np.zeros((bins_theta, bins_v, num_a))
+
+    # Evaluate heatmap
     for i, theta in enumerate(theta_samples):
+        c, s = np.cos(theta), np.sin(theta)
         for j, v in enumerate(v_samples):
+            state = [c, s, v]
 
-            state = [np.cos(theta), np.sin(theta), v]
+            for a in range(num_a):
+                idx = tuple(sa_agg.sa_to_features(state, a))
+                heatmap[i, j, a] += sa_heatmap[idx]
+                counts[i, j, a] += 1
 
-            for a in range(sa_agg.num_a()):
-                heatmap[i][j][a] = sa_heatmap[tuple(sa_agg.sa_to_features(state,a))]
-    
-    # plot_heatmap(heatmap.sum(axis=-1),save_path=save_path)
-    plot_heatmap(heatmap.reshape(bins_theta, -1), xlabel="theta, [0, 2pi]", ylabel="v, [-8, 8]",save_path=save_path)
+    # Avoid divide-by-zero
+    mask = counts > 0
+    heatmap[mask] /= counts[mask]
 
+    # Collapse action dimension (sum/mean/max depending on your preference)
+    heatmap2d = heatmap.mean(axis=-1)
+
+    # Plot
+    plot_heatmap(
+        heatmap2d,
+        xlabel="theta ∈ [0, 2π]",
+        ylabel="velocity ∈ [-8, 8]",
+        save_path=save_path
+    )
 
 def plot_sa_heatmap(env_name, sa_table, sa_agg,title="sa heatmap", save_path=None):
-
+    print(env_name)
     if env_name == "MountainCarContinuous-v0":
-        plot_heatmap(sa_table.reshape(sa_agg.shape()[0], -1), "x coordinate", "velocity", title, save_path=save_path)
-
+        plot_heatmap(sa_table.reshape(sa_agg.shape()[0], -1).T, "x coordinate", "velocity", title, save_path=save_path)
     elif env_name == "Pendulum-v1":
         plot_sa_heatmap_pendulum(sa_table, sa_agg, save_path=save_path)
-
     else:
-        print(f"Plotting not supported for {env_name}")
-        return 
+        plot_sa_heatmap_cartpole_xdot_thetadot(sa_table, sa_agg, save_path)
+
+
+import numpy as np
+import matplotlib.pyplot as plt
+
+def plot_sa_heatmap_cartpole_xdot_thetadot(sa_heatmap, sa_agg, save_path=None):
+    """
+    Plot a 2D heatmap of state-action values over x_dot and theta_dot,
+    averaging over x and theta, using sa_agg.state_to_features.
+
+    Parameters
+    ----------
+    sa_heatmap : np.ndarray
+        Tile-coded Q-values indexed by sa_agg.state_to_features(state, a)
+    sa_agg : object
+        SA aggregator / tile coder with:
+        - state_shape(): returns [x_tiles, xdot_tiles, theta_tiles, thetadot_tiles]
+        - num_a(): number of discrete actions
+        - state_to_features(state, a): maps continuous state + action to feature indices
+    save_path : str, optional
+        Path to save the figure. If None, shows the plot.
+    """
+    # State dimensions for sampling
+    bins_x, bins_xdot, bins_theta, bins_thetadot = sa_agg.state_shape()
+    num_a = sa_agg.num_a()
+
+    # Continuous sampling ranges
+    x_samples = np.linspace(-2.4, 2.4, bins_x)
+    theta_samples = np.linspace(-0.209, 0.209, bins_theta)  # ±12° in radians
+    xdot_samples = np.linspace(-5, 5, bins_xdot)
+    thetadot_samples = np.linspace(-5, 5, bins_thetadot)
+
+    heatmap = np.zeros((bins_x,  bins_theta, num_a))
+    counts = np.zeros_like(heatmap)
+
+    # Loop over x_dot and theta_dot for the axes
+    for i_xdot, xdot in enumerate(xdot_samples):
+        for j_thetadot, thetadot in enumerate(thetadot_samples):
+            for i_x, x in enumerate(x_samples):
+                for i_theta, theta in enumerate(theta_samples):
+                    state = [x, xdot, theta, thetadot]
+                    for a in range(num_a):
+                        idx = tuple(sa_agg.sa_to_features(state, a))
+                        heatmap[i_x, i_theta, a] += sa_heatmap[idx]
+                        counts[i_x, i_theta, a] += 1
+
+    # Avoid divide-by-zero
+    mask = counts > 0
+    heatmap[mask] /= counts[mask]
+
+    # Collapse action dimension (mean)
+    heatmap2d = heatmap.mean(axis=-1)
+
+    # Plot
+    plt.figure(figsize=(8,6))
+    plt.imshow(heatmap2d.T, origin='lower', aspect='auto',
+               extent=[xdot_samples[0], xdot_samples[-1],
+                       thetadot_samples[0], thetadot_samples[-1]],
+               cmap='viridis')
+    plt.colorbar(label='Q-value')
+    plt.xlabel('Cart pos x  ')
+    plt.ylabel('Pole theta')
+    plt.title('SA Heatmap (averaged over x and θ, and actions)')
+
+    if save_path:
+        plt.savefig(save_path, dpi=300)
+        plt.close()
+    else:
+        plt.show()
 
 
 

@@ -222,9 +222,7 @@ def sa_sr_from_rollouts(rollouts, sa_agg, gamma=0.99, step_size=0.01):
     nxt  = np.zeros(n, dtype=np.float32)
     delta = np.zeros(n, dtype=np.float32)
 
-
-    
-    num_samples = int(n*1.5)
+    num_samples = n 
     s_idxes = []
     s_prime_idxes = []
 
@@ -233,10 +231,11 @@ def sa_sr_from_rollouts(rollouts, sa_agg, gamma=0.99, step_size=0.01):
         s_idxes.append(sa_agg.sa_to_idx(s[:-1], a[:-1]))
         s_prime_idxes.append(sa_agg.sa_to_idx(sp[:-1], a[1:]))
     
-    for _ in range(num_samples):
+    for _ in tqdm.tqdm(range(num_samples)):
         k = np.random.randint(0, len(rollouts))
         s_idx = s_idxes[k]
         s_prime_idx = s_prime_idxes[k]
+
         for t in range(len(s_idx)):
             i  = s_idx[t]
             ip = s_prime_idx[t]
@@ -273,7 +272,7 @@ def sa_sr_from_rollouts1(rollouts, sa_agg, gamma=0.99, step_size=0.01):
     nxt  = np.zeros(n, dtype=np.float32)
     delta = np.zeros(n, dtype=np.float32)
 
-    num_samples = len(rollouts)*4
+    num_samples = n
 
     for i in range(num_samples):
         trajectory = rollouts.sample_trajectory()
@@ -322,6 +321,26 @@ def average_reward_from_rollouts(rollouts, reward_fn = None):
     return avg_reward/len(rollouts)
 
 def collect_rollouts(env, agent, T, num_rollouts, reward_fn = None, epsilon=0.0):
+    def _collect_rollout(env, agent, T, reward_fn, epsilon):
+        trajectory = Trajectory(T)
+        last_state, _ = env.reset()
+        for i in range(T):
+            action = agent.select_action(last_state, epsilon)
+            state, reward, terminated, truncated, info = env.step(action)
+            if reward_fn != None:
+                reward = reward_fn(last_state, action, state, terminated)
+            trajectory.add_transition(last_state, action, reward, state, terminated)
+            last_state = state
+            if terminated or truncated:
+                return trajectory
+        return trajectory
+    rollouts = TrajectoryContainer(T, init_capacity=num_rollouts)
+
+    for i in range(num_rollouts):
+        rollouts.add_trajectory(_collect_rollout(env, agent, T, reward_fn, epsilon))
+    return rollouts
+
+def collect_rollouts_test(env, agent, T, num_rollouts, reward_fn = None, epsilon=0.0):
     def _collect_rollout(env, agent, T, reward_fn, epsilon):
         trajectory = Trajectory(T)
         last_state, _ = env.reset()

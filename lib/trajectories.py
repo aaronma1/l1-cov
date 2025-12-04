@@ -233,7 +233,7 @@ def sa_sr_from_rollouts(rollouts, sa_agg, gamma=0.99, step_size=0.01):
         s_idxes.append(sa_agg.sa_to_idx(s[:-1], a[:-1]))
         s_prime_idxes.append(sa_agg.sa_to_idx(sp[:-1], a[1:]))
     
-    for _ in  tqdm.tqdm(range(num_samples)):
+    for _ in range(num_samples):
         k = np.random.randint(0, len(rollouts))
         s_idx = s_idxes[k]
         s_prime_idx = s_prime_idxes[k]

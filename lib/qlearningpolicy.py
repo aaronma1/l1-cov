@@ -183,13 +183,6 @@ class QLearningAgent:
 
         self.Q_w, avg_reward = _internal(self.Q_w, trajectory_tiles, offline_epochs, self.lr, self.gamma )
 
-        # for _ in range(offline_epochs):
-        #     for trajectory in trajectory_tiles:
-        #         s, a, r, s_prime, terminated = trajectory
-
-        #         for t in range(s.shape[0]):
-        #             avg_reward += r[t]
-        #             self.Q_update(s[t], a, r[t], s_prime[t], (t==s.shape[0]-1) and terminated)
         if verbose:
             print(f"average reward for offline learning {avg_reward}")
         

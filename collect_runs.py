@@ -182,8 +182,6 @@ def collect_run_sa_eigenoptions(base_args, option_args, node_num=0):
         top_eig = sa_agg.unflatten_sa_table(eigenvectors[:, 0])
         top_eig /= np.max(np.abs(top_eig))
 
-
-
         if np.dot(top_eig.flatten(), p_sa.flatten()) > 0:
             top_eig = -top_eig
 
@@ -382,5 +380,5 @@ def run_exp_test(base_args, option_args, adv_args):
 
 import experiments
 if __name__ == "__main__":
-    args = experiments.pendulum_default_qlearning(epochs=1, l1_online=5000, verbose=True)    
+    args = experiments.pendulum_default(epochs=3, l1_online=1000, verbose=True)    
     run_exp_test(*args)

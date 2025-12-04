@@ -139,13 +139,13 @@ class ReinforcePolicy(nn.Module):
                 running_reward = ep_reward
             
 
-            if i_episode % 100 == 0 and i_episode != 0:
+            if i_episode % update_every == 0 and i_episode != 0:
                 loss = self.update_policy()
             running_loss = running_loss * (1-.005) + loss*0.05
 
             gc.collect()
 
-            if (i_episode) % print_every == 0 and verbose:
+            if (i_episode+1) % print_every == 0 and verbose:
                 print('Episode {}\tEpisode reward {:.2f}\tRunning reward: {:.2f}\tLoss: {:.2f}'.format(
                     i_episode, ep_reward, running_reward, running_loss))
     
@@ -160,14 +160,14 @@ def get_reinforce_agent(env_name, gamma, lr, a_bins=None):
         _, _, a_low, a_high = environments.mountaincar_bounds()
         if a_bins == None:
             a_bins = [3]
-        mcac = AggregatingActionCoder(a_low, a_high, num_bins=a_bins[0])
+        mcac = AggregatingActionCoder(a_low, a_high, num_bins=a_bins)
         return ReinforcePolicy(gamma, lr, 2, mcac)
 
     if env_name == "Pendulum-v1":
         _, _, a_low, a_high = environments.pendulum_bounds()
         if a_bins == None:
             a_bins = [11]
-        pdac = AggregatingActionCoder(a_low, a_high, num_bins=a_bins[0])
+        pdac = AggregatingActionCoder(a_low, a_high, num_bins=a_bins)
         return ReinforcePolicy(gamma, lr, 3, pdac )
 
     if env_name == "CartPole-v1":

@@ -107,7 +107,7 @@ def pendulum_default_qlearning(epochs=15, l1_online=5000, verbose=False):
         "a_bins": [7],
         "env_name": "Pendulum-v1",
         "env_T": 200,
-        "num_rollouts": 200,
+        "num_rollouts": 100,
         "num_epochs": epochs,
     }
         
@@ -125,7 +125,7 @@ def pendulum_default_qlearning(epochs=15, l1_online=5000, verbose=False):
             "print_every": 100,
         },
         "rollout_args": {
-            "epsilon": 0.1,
+            "epsilon": 0.0,
         }
     }
     # more comprehensive qlearning args for l1 coverage
@@ -136,14 +136,14 @@ def pendulum_default_qlearning(epochs=15, l1_online=5000, verbose=False):
         "online_epochs": l1_online,
         "offline_epochs": 0,
         "learning_args": {
-            "epsilon_start": 0.3,
+            "epsilon_start": 0.5,
             "epsilon_decay": 0.999,
             "decay_every": 1,
             "verbose": verbose,
             "print_every": 100,
         },
         "rollout_args": {
-            "epsilon": 0.1,
+            "epsilon": 0.0,
         },
         "print_every": 100,
     }
@@ -154,7 +154,7 @@ def pendulum_default(epochs=15, l1_online=5000, verbose=False):
     base_args = {
         "l1_eps": 1e-4,  # regularizer epsilon for
         "s_bins": [8,8,8], 
-        "a_bins": [7],
+        "a_bins": [3],
         "env_name": "Pendulum-v1",
         "env_T": 200,
         "num_rollouts": 200,

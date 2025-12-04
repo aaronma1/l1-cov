@@ -1,4 +1,5 @@
 import numpy as np
+import lib.environments as environments
 from numba import njit
 
 @njit
@@ -224,51 +225,56 @@ class SA_Aggregator:
     
 
 class S_Reward:
-    def __init__(self, agg, reward_table):
+    def __init__(self, agg, reward_table, termination_rew=0):
         self.agg = agg
         self.reward_table = reward_table
+        self.termination_rew=termination_rew
 
     def __call__(self, state, action, next_state, terminated):
         if terminated:
-            return -1000
+            return self.termination_rew
         return self.reward_table[tuple(self.agg.s_to_features(next_state))]
 
 
 class SA_Reward:
-    def __init__(self, agg, reward_table):
+    def __init__(self, agg, reward_table, termination_rew=0):
         self.agg = agg
         self.reward_table = agg.flatten_sa_table(reward_table)
+        self.termination_rew = termination_rew
 
     def __call__(self, state, action, next_state, terminated):
         if terminated:
-            return -1000
+            return self.termination_rew
         rew = self.reward_table[self.agg.sa_to_idx(state, action)]
         return rew
 
 
 class SS_Reward:
 
-    def __init__(self, s_agg, reward_table):
+    def __init__(self, s_agg, reward_table, termination_rew=0):
         self.agg = s_agg
         self.reward_table = s_agg.flatten_s_table(reward_table)
-
+        self.termination_rew = termination_rew
 
     def __call__(self, state, action, next_state, terminated):
         if terminated:
-            return -1000
+            return self.termination_rew
         cur = self.agg.s_to_idx(state)
         next = self.agg.s_to_idx(next_state)
         return self.reward_table[next] - self.reward_table[cur]
 
 class SAS_Reward:
 
-    def __init__(self, sa_agg, reward_table, reduce_fn = np.max):
+    def __init__(self, sa_agg, reward_table, reduce_fn = np.max, termination_rew=0):
         self.agg = sa_agg
         self.reward_table = sa_agg.flatten_sa_table(reward_table)
         self.reduce_fn = reduce_fn
+        self.termination_rew = termination_rew
 
 
-    def __call__(self, state, action, next_state):
+    def __call__(self, state, action, next_state, terminated):
+        if terminated:
+            return self.termination_rew
         cur = self.reward_table[self.agg.sa_to_idx(state, action)]
         
         next_state = np.repeat(next_state[None, :], self.agg.num_a(), axis=0)
@@ -278,35 +284,26 @@ class SAS_Reward:
 
 def get_aggregator(env_name, s_bins, a_bins):
     if env_name == "MountainCarContinuous-v0":
-        s_low = [-1.2, -0.07]
-        s_high = [0.6, 0.07]
-        a_low = [-1.0]
-        a_high = [1.0]
+        s_low, s_high, a_low, a_high = environments.mountaincar_bounds()
         return Aggregator(s_low, s_high, s_bins), SA_Aggregator(
             s_low, s_high, s_bins, a_low, a_high, a_bins
         )
 
     if env_name == "Pendulum-v1":
-        s_low = [-1.0, -1.0, -8.0]
-        s_high = [1.0, 1.0, 8.0]
-        act_high = [2.0]
-        act_low = [-2.0]
+        s_low, s_high, a_low, a_high = environments.pendulum_bounds()
         return Aggregator(s_low, s_high, s_bins), SA_Aggregator(
-            s_low, s_high, s_bins, act_high, act_low, a_bins
+            s_low, s_high, s_bins, a_low, a_high, a_bins
         )
 
     if env_name == "CartPole-v1":
-        s_low = [-2.5, -3.5, -0.3, -4.0]
-        s_high = [2.5, 3.5, 0.3, 4.0]
+        s_low, s_high = environments.cartpole_bounds()
         num_actions = 2
         return Aggregator(s_low, s_high, s_bins), SA_Aggregator_Disc(
             s_low, s_high, s_bins, num_actions
         )
 
     if env_name == "AcroBot-v1":
-        s_low = [-1, -1, -1, -1, 12.6, 28.6]
-        s_high = [1, 1, 1, 1, -12.6, -28.6]
-        s_bins = [12, 12, 5, 12]
+        s_low, s_high = environments.acrobot_bounds()
         num_actions = 3
         return Aggregator(s_low, s_high, s_bins), SA_Aggregator_Disc(s_low, s_high, s_bins, a_bins)
 

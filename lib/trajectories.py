@@ -1,4 +1,5 @@
 import numpy as np
+import tqdm
 from scipy.sparse import lil_matrix, eye
 
 class Trajectory:
@@ -144,6 +145,11 @@ class TrajectoryContainer:
 
 
         self.current_idx += other.current_idx
+    
+    def sample_trajectory(self):
+        idx = np.random.randint(0, self.current_idx)
+        return self.get_trajectory(idx)
+
 
     # ----------------------
     # Iterators
@@ -216,7 +222,61 @@ def sa_sr_from_rollouts(rollouts, sa_agg, gamma=0.99, step_size=0.01):
     nxt  = np.zeros(n, dtype=np.float32)
     delta = np.zeros(n, dtype=np.float32)
 
+
+    
+    num_samples = int(n*1.5)
+    s_idxes = []
+    s_prime_idxes = []
+
     for trajectory in rollouts:
+        s, a, _, sp = trajectory.dump()
+        s_idxes.append(sa_agg.sa_to_idx(s[:-1], a[:-1]))
+        s_prime_idxes.append(sa_agg.sa_to_idx(sp[:-1], a[1:]))
+    
+    for _ in  tqdm.tqdm(range(num_samples)):
+        k = np.random.randint(0, len(rollouts))
+        s_idx = s_idxes[k]
+        s_prime_idx = s_prime_idxes[k]
+        for t in range(len(s_idx)):
+            i  = s_idx[t]
+            ip = s_prime_idx[t]
+
+            # load current SR row into dense buffer
+            curr[:] = 0.0
+            if sr.rows[i]:
+                curr[sr.rows[i]] = sr.data[i]
+
+            # load successor SR row into buffer
+            nxt[:] = 0.0
+            if sr.rows[ip]:
+                nxt[sr.rows[ip]] = sr.data[ip]
+
+            # TD update:  delta = 1 + gamma * nxt - curr
+            delta[:] = gamma * nxt - curr
+            delta[i] += 1.0
+
+            # new row = curr + step_size * delta
+            curr[:] = curr + step_size * delta
+
+            # write dense row back to sparse
+            nz = curr.nonzero()[0]
+            sr.rows[i] = nz.tolist()
+            sr.data[i] = curr[nz].tolist()
+    return sr.tocsr() + 1e-9 * eye(n, format="csr")
+
+def sa_sr_from_rollouts1(rollouts, sa_agg, gamma=0.99, step_size=0.01):
+    n = sa_agg.num_sa()
+    sr = lil_matrix((n, n), dtype=np.float32)
+
+    # dense work buffers
+    curr = np.zeros(n, dtype=np.float32)
+    nxt  = np.zeros(n, dtype=np.float32)
+    delta = np.zeros(n, dtype=np.float32)
+
+    num_samples = len(rollouts)*4
+
+    for i in range(num_samples):
+        trajectory = rollouts.sample_trajectory()
         s, a, _, sp = trajectory.dump()
 
         # Correct alignment

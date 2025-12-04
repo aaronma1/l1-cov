@@ -65,7 +65,6 @@ def setup_agent(base_args, agent_args, max_rew = 0):
     if agent_args["policy"] == "Random":
         return get_random_agent(
             base_args["env_name"], base_args["a_bins"]
-
         )
     if agent_args["policy"] == "Qlearning":
         return get_qlearning_agent(
@@ -184,15 +183,11 @@ def collect_run_sa_eigenoptions(base_args, option_args, node_num=0):
         top_eig /= np.max(np.abs(top_eig))
 
 
+
         if np.dot(top_eig.flatten(), p_sa.flatten()) > 0:
             top_eig = -top_eig
-        
-        print(eigenvalues)
-        plotting.plot_sa_heatmap(base_args["env_name"], top_eig, sa_agg, save_path=f"out/figs/{i}_topeig.png")
-        plotting.plot_sa_heatmap(base_args["env_name"], p_sa, sa_agg, save_path=f"out/figs/{i}_psa.png")
-        
-        
-        reward = SA_Reward(sa_agg, top_eig)
+
+        reward = SA_Reward(sa_agg, top_eig, termination_rew=-2)
         # learn an option
         option_policy = learn_policy(
                 env, base_args, option_args, reward, epoch_rollouts[-1]["all_rollouts"]
@@ -387,6 +382,5 @@ def run_exp_test(base_args, option_args, adv_args):
 
 import experiments
 if __name__ == "__main__":
-    args = experiments.mountaincar_qlearning_easy(epochs=5, l1_online=5000, verbose=True)    
-    
+    args = experiments.pendulum_default_qlearning(epochs=1, l1_online=5000, verbose=True)    
     run_exp_test(*args)

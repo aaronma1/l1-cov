@@ -2,6 +2,7 @@ import numpy as np
 from plotting import plot_heatmap
 from numba import jit, njit
 import lib.tiles3 as tc
+import lib.environments as environments
 
 from lib.policies import AggregatingActionCoder, DiscreteActionCoder
 
@@ -193,67 +194,33 @@ class QLearningAgent:
             print(f"average reward for offline learning {avg_reward}")
         
 
-    def plot_qtable(self, sa_agg, save_path=None):
-        state_low = [-1.2, -0.07]
-        state_high = [0.6, 0.07]
-
-        state_low  = np.asarray(state_low)
-        state_high = np.asarray(state_high)
-
-        nx = 100
-        ny = 100
-
-        xs = np.linspace(state_low[0], state_high[0], nx)
-        ys = np.linspace(state_low[1], state_high[1], ny)
-
-        Q_sa_table = np.zeros(sa_agg.shape())
-        Q_sa_counts = np.zeros(sa_agg.shape())
-
-        nA = sa_agg.act_space[0]
-
-
-        for ix, x in enumerate(xs):
-            for iy, y in enumerate(ys):
-
-                s = np.array([[x, y]])
-
-                # Evaluate Q(s,a)
-                for a in range(nA):
-
-                    Q_value = self.Q_values(self.stc.tile_state(np.array([x, y])))[a]
-
-                    Q_sa_table[tuple(sa_agg.sa_to_features(np.array([x, y]), np.array(a)))] += Q_value
-                    Q_sa_counts[tuple(sa_agg.sa_to_features(np.array([x, y]), np.array(a)))] += 1
-        Q_sa_table = Q_sa_table/(Q_sa_counts + 1e-9)
-
-        plot_heatmap(Q_sa_table.reshape(12, -1), save_path=save_path)
-
 def get_qlearning_agent(env_name, gamma, lr, a_bins = None, max_rew=0):
     if env_name == "MountainCarContinuous-v0":
-        mctc = TileCoder([-1.2, -0.07],[0.6, 0.07], num_tilings=16, num_tiles=8)
 
+        state_low, state_high, act_low, act_high = environments.mountaincar_bounds()
+        mctc = TileCoder(state_low,state_high, num_tilings=16, num_tiles=8)
         if a_bins == None:
             a_bins = [3]
-
-        mcac = AggregatingActionCoder(-1.0, 1.0, num_bins=a_bins[0])
+        mcac = AggregatingActionCoder(act_low, act_high, num_bins=a_bins)
         return QLearningAgent(mctc,mcac, gamma,lr ,max_rew=max_rew)
 
     if env_name == "Pendulum-v1":
-        pdtc = TileCoder(low=[-1.0, -1.0, -8.0], high=[1.0,1.0,8.0], num_tilings=32, num_tiles=8)
+        state_low, state_high, act_low, act_high = environments.pendulum_bounds()
+        pdtc = TileCoder(low=state_low, high=state_high, num_tilings=32, num_tiles=8)
         if a_bins == None:
-            a_bins = [11]
-        pdac = AggregatingActionCoder(-2.0, 2.0, num_bins=a_bins[0])
+            a_bins = [3]
+        pdac = AggregatingActionCoder(act_low, act_high, num_bins=a_bins)
         return QLearningAgent(pdtc, pdac, gamma=gamma, lr=lr, max_rew=max_rew)
 
     if env_name == "CartPole-v1":
-        cptc = TileCoder(low=[-2.5, -3.5, -0.3, -4.0], high=[2.5,3.5, 0.3, 4.0],num_tilings=32, num_tiles=16) 
+        state_low, state_high = environments.cartpole_bounds()
+        cptc = TileCoder(low=state_low, high=state_high,num_tilings=32, num_tiles=16) 
         cpac = DiscreteActionCoder(2)
         return QLearningAgent(cptc, cpac, gamma=gamma, lr=lr, max_rew=max_rew)
 
     
     if env_name == "Acrobot-v1":
-        state_low = [-1.0,-1.0, -1.0, -1.0, -13, -28.5]
-        state_high = [1.0, 1.0, 1.0, 1.0, 13, 28.5]
+        state_low, state_high = environments.acrobot_bounds()
         actc = TileCoder(state_low, state_high, 64, 8) 
         acac = DiscreteActionCoder(3)
         return QLearningAgent(actc, acac, gamma=gamma, lr=lr, max_rew=max_rew)

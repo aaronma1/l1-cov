@@ -16,6 +16,7 @@ import copy
 import gc
 
 from lib.policies import AggregatingActionCoder, DiscreteActionCoder
+import lib.environments as environments
 
 
 class ReinforcePolicy(nn.Module):
@@ -112,7 +113,7 @@ class ReinforcePolicy(nn.Module):
             action = self._select_action(last_state)
             state, reward, terminated, truncated, info = env.step(action)
             if reward_fn != None:
-                reward = reward_fn(last_state, action, state)
+                reward = reward_fn(last_state, action, state, terminated)
             self.rewards.append(reward)
             ep_reward += reward
 
@@ -155,15 +156,18 @@ class ReinforcePolicy(nn.Module):
 
 def get_reinforce_agent(env_name, gamma, lr, a_bins=None):
     if env_name == "MountainCarContinuous-v0":
+
+        _, _, a_low, a_high = environments.mountaincar_bounds()
         if a_bins == None:
             a_bins = [3]
-        mcac = AggregatingActionCoder(-1.0, 1.0, num_bins=a_bins[0])
+        mcac = AggregatingActionCoder(a_low, a_high, num_bins=a_bins[0])
         return ReinforcePolicy(gamma, lr, 2, mcac)
 
     if env_name == "Pendulum-v1":
+        _, _, a_low, a_high = environments.mountaincar_bounds()
         if a_bins == None:
             a_bins = [11]
-        pdac = AggregatingActionCoder(-2.0, 2.0, num_bins=a_bins[0])
+        pdac = AggregatingActionCoder(a_low, a_high, num_bins=a_bins[0])
         return ReinforcePolicy(gamma, lr, 3, pdac )
 
     if env_name == "CartPole-v1":

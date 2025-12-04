@@ -1,4 +1,5 @@
 from lib.aggregation import get_aggregator
+import lib.environments as environments
 import numpy as np
 
 class AggregatingActionCoder:
@@ -11,12 +12,12 @@ class AggregatingActionCoder:
             action_low (float): min torque
             action_high (float): max torque
         """
-        self.num_bins = num_bins
-        self.action_low = low
-        self.action_high = high
+        self.num_bins = num_bins[0]
+        self.action_low = low[0]
+        self.action_high = high[0]
 
         # Create evenly spaced discrete actions
-        self.actions = np.linspace(low, high, num_bins)
+        self.actions = np.linspace(low[0], high[0], num_bins[0])
 
     def num_actions(self):
         return self.num_bins
@@ -70,26 +71,20 @@ class RandomAgent:
         return self.ac.idx_to_act(np.random.choice(self.actions))
     
 
-
-
-
-
-    
-        
-
-
 # TODO change random agent to use action coders
 def get_random_agent(env_name, a_bins=None):
     if env_name == "MountainCarContinuous-v0":
+        _, _, a_low, a_high = environments.mountaincar_bounds()
         if a_bins == None:
             a_bins = [3]
-
-        mcac = AggregatingActionCoder(-1.0, 1.0, num_bins=a_bins[0])
+        mcac = AggregatingActionCoder(a_low, a_high, num_bins=a_bins)
         return RandomAgent(mcac)
     if env_name == "Pendulum-v1":
+
+        _, _, a_low, a_high = environments.pendulum_bounds()
         if a_bins == None:
             a_bins = [11]
-        pdac = AggregatingActionCoder(-2.0, 2.0, num_bins=a_bins[0])
+        pdac = AggregatingActionCoder(a_low, a_high, num_bins=a_bins)
         return RandomAgent(pdac)
 
     if env_name == "CartPole-v1":

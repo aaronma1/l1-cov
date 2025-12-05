@@ -206,7 +206,7 @@ def compute_stats_from_experiments(base_args, exp_dump_path, save_path=None,  ma
             else:
                 for key in run_stats.keys():
                     stats[key].append(run_stats[key])
-    for key in run_stats.keys():
+    for key in stats.keys():
         stats[key] = np.array(stats[key])
     dump_pickle(stats, save_path)
 
@@ -219,6 +219,14 @@ def run_experiments(base_args, option_args, adversery_args, N_RUNS, SAVE_DIR, MA
         "adversery_args":adversery_args,
     }
     dump_pickle(params, os.path.join(SAVE_DIR, "params.pkl"))
+
+    print("#### collecting eigenoptions rollouts ####")
+    save_dir_eigenoptions = os.path.join(SAVE_DIR, "eigenoptions/")
+    os.makedirs(save_dir_eigenoptions, exist_ok=True)
+    run_experiment_eigenoptions(base_args, option_args, save_dir=save_dir_eigenoptions, max_workers=MAX_WORKERS, n_runs=N_RUNS)
+    print("#### computing eigenoptions l1 coverage ####")
+    compute_l1_from_experiment(base_args, adversery_args, exp_dump_path=save_dir_eigenoptions, max_workers=MAX_WORKERS)
+    compute_stats_from_experiments(base_args, exp_dump_path=save_dir_eigenoptions)
 
     print("#### collecting random rollouts ####")
     save_dir_random = os.path.join(SAVE_DIR, "random/")
@@ -235,14 +243,6 @@ def run_experiments(base_args, option_args, adversery_args, N_RUNS, SAVE_DIR, MA
     compute_l1_from_experiment(base_args, adversery_args, exp_dump_path=save_dir_maxent, max_workers=MAX_WORKERS,)
     compute_stats_from_experiments(base_args, exp_dump_path=save_dir_maxent)
 
-
-    print("#### collecting eigenoptions rollouts ####")
-    save_dir_eigenoptions = os.path.join(SAVE_DIR, "eigenoptions/")
-    os.makedirs(save_dir_eigenoptions, exist_ok=True)
-    run_experiment_eigenoptions(base_args, option_args, save_dir=save_dir_eigenoptions, max_workers=MAX_WORKERS, n_runs=N_RUNS)
-    print("#### computing eigenoptions l1 coverage ####")
-    compute_l1_from_experiment(base_args, adversery_args, exp_dump_path=save_dir_eigenoptions, max_workers=MAX_WORKERS)
-    compute_stats_from_experiments(base_args, exp_dump_path=save_dir_eigenoptions)
 
 
     print("#### collecting codex rollouts ####")
@@ -263,7 +263,7 @@ def run_experiments(base_args, option_args, adversery_args, N_RUNS, SAVE_DIR, MA
 import experiments
 if __name__ == "__main__":
     # multiprocessing.set_start_method("spawn", force=True) 
-    args = experiments.pendulum_default_qlearning(epochs=1, l1_online=10000)
+    args = experiments.pendulum_default_qlearning(epochs=10, l1_online=10000)
     run_experiments(*args, N_RUNS=4, MAX_WORKERS=4, SAVE_DIR="out/pendulum2")
     
 

@@ -127,10 +127,9 @@ def learn_policy(env, base_args, option_args, reward_fn, transitions=None):
 #           Rollout Collection
 ###########################################
 
-def eig_sparse(SR, k=131):
+def eigs(SR):
     SR = (SR + SR.T) / 2.0
-
-    eigenvalues, eigenvectors = eigsh(SR, sigma=None, k=k, which="LM")
+    eigenvalues, eigenvectors = np.linalg.eigh(SR)
     idx = np.argsort(-eigenvalues.real)
     eigenvalues = np.real_if_close(eigenvalues, tol=1e5)[idx]
     eigenvectors = np.real_if_close(eigenvectors, tol=1e5)[:, idx]
@@ -148,7 +147,7 @@ def collect_run_eigenoptions(base_args, option_args):
         )
         SR = sr_from_rollouts(epoch_rollouts[-1]["all_rollouts"], s_agg)
         p_s = p_s_from_rollouts(epoch_rollouts[-1]["all_rollouts"], s_agg)
-        eigenvectors, eigenvalues = eig_sparse(SR, k=10)
+        eigenvectors, eigenvalues = eigs(SR)
         top_eig = s_agg.unflatten_s_table(eigenvectors[:, 0])
         if np.dot(top_eig.flatten(), p_s.flatten()) > 0:
             top_eig = -top_eig
@@ -167,18 +166,17 @@ def collect_run_eigenoptions(base_args, option_args):
     return epoch_rollouts, options
 
 def collect_run_sa_eigenoptions(base_args, option_args, node_num=0):
-
     env, s_agg, sa_agg = setup_env(base_args)
     options = [setup_agent(base_args, {"policy":"Random"})]
     epoch_rollouts = []
 
-    for _ in range(base_args["num_epochs"]):
+    for i in range(base_args["num_epochs"]):
         epoch_rollouts.append(
             collect_rollouts_from_options(env, base_args, option_args, options)
         )
         SR = sa_sr_from_rollouts(epoch_rollouts[-1]["all_rollouts"], sa_agg)
         p_sa = p_sa_from_rollouts(epoch_rollouts[-1]["all_rollouts"], sa_agg)
-        eigenvectors, eigenvalues = eig_sparse(SR, k=10)
+        eigenvectors, eigenvalues = eigs(SR)
         top_eig = sa_agg.unflatten_sa_table(eigenvectors[:, 0])
         top_eig /= np.max(np.abs(top_eig))
 
@@ -186,12 +184,15 @@ def collect_run_sa_eigenoptions(base_args, option_args, node_num=0):
             top_eig = -top_eig
 
         reward = SA_Reward(sa_agg, top_eig, termination_rew=-200)
+
+        plotting.plot_sa_heatmap(base_args["env_name"], top_eig, sa_agg, save_path=f"out/figs/{i+1}top_eig.png")
+        plotting.plot_sa_heatmap(base_args["env_name"], p_sa, sa_agg, save_path=f"out/figs/{i}psa.png")
+        plotting.plot_sa_heatmap(base_args["env_name"], sa_agg.unflatten_sa_table(eigenvectors[:, 1]), sa_agg, save_path=f"out/figs/{i}2ndeig.png")
         # learn an option
         option_policy = learn_policy(
                 env, base_args, option_args, reward, epoch_rollouts[-1]["all_rollouts"]
             )
         options.append(option_policy)
-
 
     # collect last epoch rollout
     epoch_rollouts.append(
@@ -350,8 +351,8 @@ def compute_stats_from_run(base_args, transitions):
 
 def run_exp_test(base_args, option_args, adv_args):
 
-    trajectories_eo, _ = collect_run_sa_eigenoptions(base_args, option_args)
     trajectories_codex, _ = collect_run_codex(base_args, option_args)
+    trajectories_eo, _ = collect_run_sa_eigenoptions(base_args, option_args)
     trajectories_maxent, _ = collect_run_maxent(base_args, option_args)
 
 
@@ -381,5 +382,5 @@ def run_exp_test(base_args, option_args, adv_args):
 
 import experiments
 if __name__ == "__main__":
-    args = experiments.pendulum_default_qlearning(epochs=1, l1_online=1000, verbose=True)    
+    args = experiments.pendulum_default_qlearning(epochs=5, l1_online=10000, verbose=True)    
     run_exp_test(*args)

@@ -131,7 +131,7 @@ class QLearningAgent:
             if i == 0:
                 running_reward = ep_reward
             else:
-                running_reward = running_reward * 0.99 + ep_reward * 0.01 
+                running_reward = running_reward * 0.95 + ep_reward * 0.05
 
             # decay epsilon
             if i % decay_every == 0:
@@ -189,9 +189,7 @@ class QLearningAgent:
         
 
 def get_qlearning_agent(env_name, gamma, lr, a_bins = None, max_rew=1):
-    print(max_rew)
     if env_name == "MountainCarContinuous-v0":
-
         state_low, state_high, act_low, act_high = environments.mountaincar_bounds()
         mctc = TileCoder(state_low,state_high, num_tilings=16, num_tiles=8)
         if a_bins == None:
@@ -201,7 +199,7 @@ def get_qlearning_agent(env_name, gamma, lr, a_bins = None, max_rew=1):
 
     if env_name == "Pendulum-v1":
         state_low, state_high, act_low, act_high = environments.pendulum_bounds()
-        pdtc = TileCoder(low=state_low, high=state_high, num_tilings=32, num_tiles=4)
+        pdtc = TileCoder(low=state_low, high=state_high, num_tilings=32, num_tiles=16)
         if a_bins == None:
             a_bins = [3]
         pdac = AggregatingActionCoder(act_low, act_high, num_bins=a_bins)
@@ -212,7 +210,6 @@ def get_qlearning_agent(env_name, gamma, lr, a_bins = None, max_rew=1):
         cptc = TileCoder(low=state_low, high=state_high,num_tilings=32, num_tiles=4) 
         cpac = DiscreteActionCoder(2)
         return QLearningAgent(cptc, cpac, gamma=gamma, lr=lr, max_rew=max_rew)
-
     
     if env_name == "Acrobot-v1":
         state_low, state_high = environments.acrobot_bounds()

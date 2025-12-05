@@ -103,8 +103,8 @@ def mountaincar_qlearning_hard(epochs=15, l1_online=5000, verbose=False):
 def pendulum_default_qlearning(epochs=15, l1_online=5000, verbose=False):
     base_args = {
         "l1_eps": 1e-4,  # regularizer epsilon for
-        "s_bins": [10, 10, 10], 
-        "a_bins": [11],
+        "s_bins": [10, 10, 12], 
+        "a_bins": [5],
         "env_name": "Pendulum-v1",
         "env_T": 200,
         "num_rollouts": 400,
@@ -115,8 +115,8 @@ def pendulum_default_qlearning(epochs=15, l1_online=5000, verbose=False):
         "policy": "Qlearning",
         "gamma":0.99,
         "lr":0.01,
-        "online_epochs":1000,
-        "offline_epochs":15,
+        "online_epochs":2000,
+        "offline_epochs":5,
         "learning_args": {
             "epsilon_start": 0.1,
             "epsilon_decay": 0.999,
@@ -125,7 +125,7 @@ def pendulum_default_qlearning(epochs=15, l1_online=5000, verbose=False):
             "print_every": 100,
         },
         "rollout_args": {
-            "epsilon": 0.0,
+            "epsilon": 0.1,
         }
     }
     # more comprehensive qlearning args for l1 coverage
@@ -134,7 +134,7 @@ def pendulum_default_qlearning(epochs=15, l1_online=5000, verbose=False):
         "gamma": 0.99,
         "lr": 0.01,
         "online_epochs": l1_online,
-        "offline_epochs": 0,
+        "offline_epochs": 1000,
         "learning_args": {
             "epsilon_start": 0.0,
             "epsilon_decay": 0.999,

@@ -318,7 +318,6 @@ def compute_l1_from_run(base_args, adv_args, run):
         p_sa = p_sa_from_rollouts(rollouts, sa_agg)
         l1_covs.append(average_reward_from_rollouts(rollouts))
         adv_policies.append(adv_policy)
-        plotting.plot_sa_heatmap(base_args["env_name"], p_sa, sa_agg, save_path=f"out/figs/{i}_adv_psa.png")
     return l1_covs, adv_policies
 
 

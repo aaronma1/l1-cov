@@ -308,12 +308,11 @@ if __name__ == "__main__":
     kwargs = parse_args()
     
     if kwargs.exp_name == "MountainCar":
-        args = experiments.mountaincar_qlearning_easy(epochs=20, l1_online=10000)
+        args = experiments.mountaincar_qlearning_easy(epochs=kwargs.epochs, l1_online=10000)
     if kwargs.exp_name == "Pendulum":
-        args = experiments.pendulum_default_qlearning(epochs=20, l1_online=20000)
+        args = experiments.pendulum_default_qlearning(epochs=kwargs.epochs, l1_online=20000)
     if kwargs.exp_name == "CartPole":
-        args = experiments.cartpole_default(epochs=20, l1_online=40000)
-
+        args = experiments.cartpole_default(epochs=kwargs.epochs, l1_online=40000)
     
     
     run_experiments(*args, N_RUNS= kwargs.n_runs, MAX_WORKERS=kwargs.max_workers, SAVE_DIR=kwargs.save_dir)

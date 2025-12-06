@@ -125,7 +125,7 @@ def pendulum_default_qlearning(epochs=15, l1_online=5000, verbose=False):
             "print_every": 100,
         },
         "rollout_args": {
-            "epsilon": 0.1,
+            "epsilon": 0.0,
         }
     }
     # more comprehensive qlearning args for l1 coverage

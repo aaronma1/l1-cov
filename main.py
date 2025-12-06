@@ -272,7 +272,7 @@ def parse_args():
     )
 
     parser.add_argument(
-        "--n_jobs",
+        "--n_runs",
         type=int,
         required=True,
         help="Total number of jobs to run"
@@ -285,7 +285,7 @@ def parse_args():
         help="Number of epochs to run (default: 1)"
     )
     parser.add_argument(
-        "--save_path",
+        "--save_dir",
         type=str,
         default="out",
         help="Save path"
@@ -316,7 +316,7 @@ if __name__ == "__main__":
 
     
     
-    run_experiments(*args, N_RUNS=4, MAX_WORKERS=4, SAVE_DIR="out/pendulum2")
+    run_experiments(*args, N_RUNS= kwargs.n_runs, MAX_WORKERS=kwargs.max_workers, SAVE_DIR=kwargs.save_dir)
     
 
     

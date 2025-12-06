@@ -259,11 +259,63 @@ def run_experiments(base_args, option_args, adversery_args, N_RUNS, SAVE_DIR, MA
 # Experiment Configurations
 #######################V##############
 
+# def parse_args():
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Job runner configuration")
+
+    parser.add_argument(
+        "--max_workers",
+        type=int,
+        required=True,
+        help="Number of worker processes to spawn"
+    )
+
+    parser.add_argument(
+        "--n_jobs",
+        type=int,
+        required=True,
+        help="Total number of jobs to run"
+    )
+
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=15,
+        help="Number of epochs to run (default: 1)"
+    )
+    parser.add_argument(
+        "--save_path",
+        type=str,
+        default="out",
+        help="Save path"
+    )
+
+    parser.add_argument(
+        "--exp_name",
+        type=str,
+        default="MountainCar",
+        help="MountainCar | Pendulum | CartPole"
+    )
+
+    return parser.parse_args()
+
 
 import experiments
 if __name__ == "__main__":
     # multiprocessing.set_start_method("spawn", force=True) 
-    args = experiments.pendulum_default_qlearning(epochs=10, l1_online=10000)
+
+    kwargs = parse_args()
+    
+    if kwargs.exp_name == "MountainCar":
+        args = experiments.mountaincar_qlearning_easy(epochs=20, l1_online=10000)
+    if kwargs.exp_name == "Pendulum":
+        args = experiments.pendulum_default_qlearning(epochs=20, l1_online=20000)
+    if kwargs.exp_name == "CartPole":
+        args = experiments.cartpole_default(epochs=20, l1_online=40000)
+
+    
+    
     run_experiments(*args, N_RUNS=4, MAX_WORKERS=4, SAVE_DIR="out/pendulum2")
     
 

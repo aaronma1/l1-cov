@@ -134,7 +134,7 @@ def pendulum_default_qlearning(epochs=15, l1_online=5000, verbose=False):
         "gamma": 0.99,
         "lr": 0.01,
         "online_epochs": l1_online,
-        "offline_epochs": 1000,
+        "offline_epochs": 10000,
         "learning_args": {
             "epsilon_start": 0.0,
             "epsilon_decay": 0.999,

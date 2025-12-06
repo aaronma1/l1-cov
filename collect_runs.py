@@ -185,9 +185,6 @@ def collect_run_sa_eigenoptions(base_args, option_args, node_num=0):
 
         reward = SA_Reward(sa_agg, top_eig, termination_rew=-200)
 
-        plotting.plot_sa_heatmap(base_args["env_name"], top_eig, sa_agg, save_path=f"out/figs/{i+1}top_eig.png")
-        plotting.plot_sa_heatmap(base_args["env_name"], p_sa, sa_agg, save_path=f"out/figs/{i}psa.png")
-        plotting.plot_sa_heatmap(base_args["env_name"], sa_agg.unflatten_sa_table(eigenvectors[:, 1]), sa_agg, save_path=f"out/figs/{i}2ndeig.png")
         # learn an option
         option_policy = learn_policy(
                 env, base_args, option_args, reward, epoch_rollouts[-1]["all_rollouts"]

@@ -14,10 +14,12 @@ from lib.reinforce import get_reinforce_agent
 from lib.aggregation import get_aggregator, S_Reward, SA_Reward, SAS_Reward, SS_Reward
 import plotting
 
-from scipy.sparse.linalg import eigsh
 from scipy.stats import entropy
 import gymnasium as gym
 import numpy as np
+ 
+
+import torch
 
 ###########################################
 #           Utility Functions
@@ -129,13 +131,18 @@ def learn_policy(env, base_args, option_args, reward_fn, transitions=None):
 
 def eigs(SR):
     SR = (SR + SR.T) / 2.0
-    eigenvalues, eigenvectors = np.linalg.eigh(SR)
+    # do computations on cuda only inside worker
+    SR_torch = torch.as_tensor(SR, device="cuda", dtype=torch.float64)
+    eigenvalues, eigenvectors = torch.linalg.eigh(SR_torch)
+    eigenvalues = eigenvalues.cpu().numpy()
+    eigenvectors = eigenvectors.cpu().numpy()
+
     idx = np.argsort(-eigenvalues.real)
     eigenvalues = np.real_if_close(eigenvalues, tol=1e5)[idx]
     eigenvectors = np.real_if_close(eigenvectors, tol=1e5)[:, idx]
     return eigenvectors, eigenvalues
 
-def collect_run_eigenoptions(base_args, option_args):
+def collect_run_eigenoptions(base_args, option_args, node_num=0):
     env, s_agg, _ = setup_env(base_args)
 
     options = [setup_agent(base_args, {"policy":"Random"})]
@@ -379,5 +386,5 @@ def run_exp_test(base_args, option_args, adv_args):
 
 import experiments
 if __name__ == "__main__":
-    args = experiments.pendulum_default_qlearning(epochs=5, l1_online=10000, verbose=True)    
+    args = experiments.pendulum_default_qlearning(epochs=1, l1_online=10000, verbose=True)    
     run_exp_test(*args)

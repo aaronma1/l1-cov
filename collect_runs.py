@@ -129,13 +129,25 @@ def learn_policy(env, base_args, option_args, reward_fn, transitions=None):
 #           Rollout Collection
 ###########################################
 
+def wait_gpu(SR):
+
+    retries = 100
+
+    for i in range(retries):
+        try:
+            SR_torch = torch.as_tensor(SR, device="cuda", dtype=torch.float64)
+            eigenvalues, eigenvectors = torch.linalg.eigh(SR_torch)
+            eigenvalues = eigenvalues.cpu().numpy()
+            eigenvectors = eigenvectors.cpu().numpy()
+            return eigenvalues
+        except RuntimeError as E:
+            pass
+
 def eigs(SR):
     SR = (SR + SR.T) / 2.0
     # do computations on cuda only inside worker
-    SR_torch = torch.as_tensor(SR, device="cuda", dtype=torch.float64)
-    eigenvalues, eigenvectors = torch.linalg.eigh(SR_torch)
-    eigenvalues = eigenvalues.cpu().numpy()
-    eigenvectors = eigenvectors.cpu().numpy()
+
+    eigenvectors, eigenvalues = wait_gpu(SR)
 
     idx = np.argsort(-eigenvalues.real)
     eigenvalues = np.real_if_close(eigenvalues, tol=1e5)[idx]

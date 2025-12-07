@@ -367,7 +367,7 @@ def parse_args():
     parser.add_argument(
         "--epochs",
         type=int,
-        default=15,
+        default=20,
         help="Number of epochs to run (default: 1)"
     )
     parser.add_argument(

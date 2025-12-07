@@ -3,11 +3,10 @@ import pickle
 import os
 import tempfile
 import argparse
-
 from concurrent.futures import ProcessPoolExecutor, as_completed
 import numpy as np
+import multiprocessing
 
-from collect_runs import collect_run_codex, collect_run_sa_eigenoptions, collect_run_random, collect_run_maxent, compute_l1_from_run, compute_stats_from_run
 
 
 ######################################
@@ -42,15 +41,20 @@ def read_pickle(save_name):
 
 
 def _run_experiment_eigenoptions(base_args, option_args, save_dir, run_id, save_fn=dump_pickle):
+    # lazy import to init cuda in worker
+    from collect_runs import collect_run_eigenoptions
+
     save_path_transitions = os.path.join(save_dir, f"part{run_id}_run.pkl")
     save_path_options = os.path.join(save_dir, f"part{run_id}_options.pkl")
+
     if os.path.exists(save_path_options) and os.path.exists(save_path_transitions):
         return
-    transitions, options = collect_run_sa_eigenoptions(base_args, option_args)
+    transitions, options = collect_run_eigenoptions(base_args, option_args, node_num=run_id)
     save_fn(transitions, save_path_transitions)
     save_fn(options, save_path_options)
-def run_experiment_eigenoptions(base_args, option_args, save_dir, n_runs, max_workers=16):
 
+
+def run_experiment_eigenoptions(base_args, option_args, save_dir, n_runs, max_workers=16):
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = [
             executor.submit(
@@ -68,13 +72,47 @@ def run_experiment_eigenoptions(base_args, option_args, save_dir, n_runs, max_wo
             print(f"done run {i}")
             del f
 
+def _run_experiment_sa_eigenoptions(base_args, option_args, save_dir, run_id, save_fn=dump_pickle):
+    # lazy import to init cuda in worker
+    from collect_runs import collect_run_sa_eigenoptions
 
-def _run_experiment_codex(base_args, option_args, save_dir, run_id, save_fn=dump_pickle):
     save_path_transitions = os.path.join(save_dir, f"part{run_id}_run.pkl")
     save_path_options = os.path.join(save_dir, f"part{run_id}_options.pkl")
     if os.path.exists(save_path_options) and os.path.exists(save_path_transitions):
         return
-    transitions, options = collect_run_codex(base_args, option_args)
+
+    transitions, options = collect_run_sa_eigenoptions(base_args, option_args, node_num=run_id)
+    save_fn(transitions, save_path_transitions)
+    save_fn(options, save_path_options)
+
+def run_experiment_sa_eigenoptions(base_args, option_args, save_dir, n_runs, max_workers=16):
+
+    with ProcessPoolExecutor(max_workers=max_workers) as executor:
+        futures = [
+            executor.submit(
+                _run_experiment_sa_eigenoptions, 
+                base_args=base_args, 
+                option_args=option_args, 
+                save_dir= save_dir,
+                run_id = i,
+                save_fn=dump_pickle,
+            )
+            for i in range(n_runs)
+        ]
+
+        for i, f in enumerate(as_completed(futures)):
+            print(f"done run {i}")
+            del f
+
+
+def _run_experiment_codex(base_args, option_args, save_dir, run_id, save_fn=dump_pickle):
+    # lazy import to init cuda in worker
+    from collect_runs import collect_run_codex
+    save_path_transitions = os.path.join(save_dir, f"part{run_id}_run.pkl")
+    save_path_options = os.path.join(save_dir, f"part{run_id}_options.pkl")
+    if os.path.exists(save_path_options) and os.path.exists(save_path_transitions):
+        return
+    transitions, options = collect_run_codex(base_args, option_args, node_num=run_id)
     save_fn(transitions, save_path_transitions)
     save_fn(options, save_path_options)
 def run_experiment_codex(base_args, option_args, save_dir, n_runs, max_workers=16):
@@ -94,13 +132,17 @@ def run_experiment_codex(base_args, option_args, save_dir, n_runs, max_workers=1
             del f
 
 def _run_experiment_maxent(base_args, option_args, save_dir, run_id, save_fn=dump_pickle):
+    # lazy import to init cuda in worker
+    from collect_runs import collect_run_maxent
+
     save_path_transitions = os.path.join(save_dir, f"part{run_id}_run.pkl")
     save_path_options = os.path.join(save_dir, f"part{run_id}_options.pkl")
     if os.path.exists(save_path_options) and os.path.exists(save_path_transitions):
         return
-    transitions, options = collect_run_maxent(base_args, option_args)
+    transitions, options = collect_run_maxent(base_args, option_args, node_num=run_id)
     save_fn(transitions, save_path_transitions)
     save_fn(options, save_path_options)
+
 def run_experiment_maxent(base_args, option_args, save_dir, n_runs, max_workers=16):
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = [
@@ -118,6 +160,9 @@ def run_experiment_maxent(base_args, option_args, save_dir, n_runs, max_workers=
             del f
 
 def _run_experiment_random(base_args, save_dir, run_id, save_fn=dump_pickle):
+    # lazy import to init cuda in worker
+    from collect_runs import collect_run_random
+
     save_path_transitions = os.path.join(save_dir, f"part{run_id}_run.pkl")
     if os.path.exists(save_path_transitions):
         return
@@ -151,6 +196,9 @@ def list_pickle_runs(directory):
     )
 
 def _compute_l1_from_experiment(base_args, adv_args, fpath, read_fn=read_pickle):
+
+    # lazy import to init cuda in worker
+    from collect_runs import compute_l1_from_run
     run = read_fn(fpath)
     l1_covs, adv_policy = compute_l1_from_run(base_args, adv_args, run)
     return l1_covs
@@ -181,6 +229,8 @@ def compute_l1_from_experiment(base_args, adv_args, exp_dump_path, save_path=Non
 
 
 def _compute_stats_from_experiment(base_args, fpath, read_fn=read_pickle):
+    # lazy import to init cuda in worker
+    from collect_runs import compute_stats_from_run
     runs = read_pickle(fpath)
     stats = compute_stats_from_run(base_args, runs)
     return stats
@@ -228,6 +278,16 @@ def run_experiments(base_args, option_args, adversery_args, N_RUNS, SAVE_DIR, MA
     compute_l1_from_experiment(base_args, adversery_args, exp_dump_path=save_dir_eigenoptions, max_workers=MAX_WORKERS)
     compute_stats_from_experiments(base_args, exp_dump_path=save_dir_eigenoptions)
 
+    print("#### collecting sa-eigenoptions rollouts ####")
+    save_dir_sa_eigenoptions = os.path.join(SAVE_DIR, "sa-eigenoptions/")
+    os.makedirs(save_dir_sa_eigenoptions, exist_ok=True)
+    run_experiment_eigenoptions(base_args, option_args, save_dir=save_dir_sa_eigenoptions, max_workers=MAX_WORKERS, n_runs=N_RUNS)
+    print("#### computing sa-eigenoptions l1 coverage ####")
+    compute_l1_from_experiment(base_args, adversery_args, exp_dump_path=save_dir_sa_eigenoptions, max_workers=MAX_WORKERS)
+    compute_stats_from_experiments(base_args, exp_dump_path=save_dir_sa_eigenoptions)
+
+
+
     print("#### collecting random rollouts ####")
     save_dir_random = os.path.join(SAVE_DIR, "random/")
     os.makedirs(save_dir_random, exist_ok=True)
@@ -252,6 +312,20 @@ def run_experiments(base_args, option_args, adversery_args, N_RUNS, SAVE_DIR, MA
     print("#### computing codex l1 coverage ####")
     compute_l1_from_experiment(base_args, adversery_args, exp_dump_path=save_dir_codex, max_workers=MAX_WORKERS,)
     compute_stats_from_experiments(base_args, exp_dump_path=save_dir_codex)
+
+
+# requires cuda
+def collect_runs_eo(base_args, option_args, adversery_args, N_RUNS, SAVE_DIR, MAX_WORKERS):
+    print("#### collecting eigenoptions rollouts ####")
+    save_dir_eigenoptions = os.path.join(SAVE_DIR, "eigenoptions/")
+    os.makedirs(save_dir_eigenoptions, exist_ok=True)    # lazy import to init cuda in worker
+    from collect_runs import compute_l1_from_run
+    run_experiment_eigenoptions(base_args, option_args, save_dir=save_dir_eigenoptions, max_workers=MAX_WORKERS, n_runs=N_RUNS)
+    print("#### collecting sa-eigenoptions rollouts ####")
+    save_dir_sa_eigenoptions = os.path.join(SAVE_DIR, "sa-eigenoptions/")
+    os.makedirs(save_dir_sa_eigenoptions, exist_ok=True)
+    run_experiment_eigenoptions(base_args, option_args, save_dir=save_dir_sa_eigenoptions, max_workers=MAX_WORKERS, n_runs=N_RUNS)
+
 
 
 
@@ -298,12 +372,19 @@ def parse_args():
         help="MountainCar | Pendulum | CartPole"
     )
 
+    parser.add_argument(
+        "--collect_eo",
+        action="store_true",
+        default=False,
+    )
+
     return parser.parse_args()
 
 
 import experiments
 if __name__ == "__main__":
     # multiprocessing.set_start_method("spawn", force=True) 
+    
 
     kwargs = parse_args()
     
@@ -314,8 +395,11 @@ if __name__ == "__main__":
     if kwargs.exp_name == "CartPole":
         args = experiments.cartpole_default(epochs=kwargs.epochs, l1_online=40000)
     
-    
-    run_experiments(*args, N_RUNS= kwargs.n_runs, MAX_WORKERS=kwargs.max_workers, SAVE_DIR=kwargs.save_dir)
-    
+    if kwargs.collect_eo:
+        print(kwargs.save_dir)
+        collect_runs_eo(*args, N_RUNS= kwargs.n_runs, MAX_WORKERS=kwargs.max_workers, SAVE_DIR=kwargs.save_dir)
+
+    else:
+        run_experiments(*args, N_RUNS= kwargs.n_runs, MAX_WORKERS=kwargs.max_workers, SAVE_DIR=kwargs.save_dir)
 
     

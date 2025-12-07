@@ -246,7 +246,6 @@ class SA_Reward:
 
     def __call__(self, state, action, next_state, terminated):
         if terminated:
-            print("terminated")
             return self.termination_rew
         rew = self.reward_table[self.agg.sa_to_idx(state, action)]
         return rew

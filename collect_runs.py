@@ -347,8 +347,9 @@ def compute_stats_from_run(base_args, transitions):
 
 def run_exp_test(base_args, option_args, adv_args):
 
+    trajectories_eo, _ = collect_run_eigenoptions(base_args, option_args)
+    trajectories_sa_eo, _ = collect_run_sa_eigenoptions(base_args, option_args)
     trajectories_codex, _ = collect_run_codex(base_args, option_args)
-    trajectories_eo, _ = collect_run_sa_eigenoptions(base_args, option_args)
     trajectories_maxent, _ = collect_run_maxent(base_args, option_args)
 
 

@@ -21,6 +21,9 @@ import numpy as np
 
 import torch
 
+import time
+import random
+
 ###########################################
 #           Utility Functions
 ###########################################
@@ -141,7 +144,7 @@ def wait_gpu(SR):
             eigenvectors = eigenvectors.cpu().numpy()
             return eigenvectors, eigenvalues
         except RuntimeError as E:
-            pass
+            time.sleep(random.random())
 
 def eigs(SR):
     SR = (SR + SR.T) / 2.0
@@ -217,7 +220,7 @@ def collect_run_sa_eigenoptions(base_args, option_args, node_num=0):
     return epoch_rollouts, options
 
 
-def collect_run_codex(base_args, option_args):
+def collect_run_codex(base_args, option_args, node_num=0):
     env, _, sa_agg = setup_env(base_args)
     epoch_rollouts = []
     options = [setup_agent(base_args, {"policy":"Random"})]
@@ -248,7 +251,7 @@ def collect_run_codex(base_args, option_args):
     )
     return epoch_rollouts, options
 
-def collect_run_maxent(base_args, option_args):
+def collect_run_maxent(base_args, option_args, node_num=0):
     def ent_reward(p_s):
         eps = np.sqrt(np.size(p_s))
         return 1/(p_s + eps)

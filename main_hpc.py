@@ -1,0 +1,259 @@
+
+
+
+import argparse
+import os
+import tempfile
+import pickle
+
+
+
+from concurrent.futures import ProcessPoolExecutor, as_completed
+import multiprocessing
+from collect_runs import collect_run_codex, collect_run_eigenoptions, collect_run_maxent, collect_run_random, collect_run_sa_eigenoptions, compute_l1_from_run, compute_stats_from_run
+
+
+def dump_pickle(obj, save_path):
+    """Atomic write — safe against parallel saves or crashes"""
+    dirpath = os.path.dirname(save_path)
+    fd, tmppath = tempfile.mkstemp(dir=dirpath)
+    os.close(fd)
+    with open(tmppath, "wb") as f:
+        pickle.dump(obj, f, protocol=pickle.HIGHEST_PROTOCOL)
+    os.replace(tmppath, save_path)
+
+
+
+def read_pickle(save_name):
+    """
+    Thread-safe pickle read.
+    Safe even if other threads are simultaneously calling dump_pickle()
+    on the same file.
+    """
+    with open(save_name, "rb") as f:
+        obj = pickle.load(f)
+        return obj
+
+
+def _run_experiment_eigenoptions(base_args, option_args, save_dir, run_id):
+    os.makedirs(save_dir, exist_ok=True)
+    save_path_transitions = os.path.join(save_dir, f"part{run_id}_run.pkl")
+    save_path_options = os.path.join(save_dir, f"part{run_id}_options.pkl")
+
+    if os.path.exists(save_path_options) and os.path.exists(save_path_transitions):
+        return
+    try:
+        transitions, options = collect_run_eigenoptions(base_args, option_args, node_num=run_id)
+        dump_pickle(transitions, save_path_transitions)
+        dump_pickle(options, save_path_options)
+    except Exception as e:
+        print("EXCEPTION:", e)
+        import traceback
+        traceback.print_exc()    
+
+def _run_experiment_sa_eigenoptions(base_args, option_args, save_dir, run_id):
+    os.makedirs(save_dir, exist_ok=True)
+    save_path_transitions = os.path.join(save_dir, f"part{run_id}_run.pkl")
+    save_path_options = os.path.join(save_dir, f"part{run_id}_options.pkl")
+    if os.path.exists(save_path_options) and os.path.exists(save_path_transitions):
+        return
+
+    try:
+        transitions, options = collect_run_sa_eigenoptions(base_args, option_args, node_num=run_id)
+        dump_pickle(transitions, save_path_transitions)
+        dump_pickle(options, save_path_options)
+    except Exception as e:
+        print("EXCEPTION:", e)
+        import traceback
+        traceback.print_exc()    
+
+
+    dump_pickle(transitions, save_path_transitions)
+    dump_pickle(options, save_path_options)
+
+def _run_experiment_codex(base_args, option_args, save_dir, run_id):
+    os.makedirs(save_dir, exist_ok=True)
+    save_path_transitions = os.path.join(save_dir, f"part{run_id}_run.pkl")
+    save_path_options = os.path.join(save_dir, f"part{run_id}_options.pkl")
+    if os.path.exists(save_path_options) and os.path.exists(save_path_transitions):
+        return
+    try:
+        transitions, options = collect_run_codex(base_args, option_args, node_num=run_id)
+        dump_pickle(transitions, save_path_transitions)
+        dump_pickle(options, save_path_options)
+    except Exception as e:
+        print("EXCEPTION:", e)
+        import traceback
+        traceback.print_exc()    
+    dump_pickle(transitions, save_path_transitions)
+    dump_pickle(options, save_path_options)
+    
+
+def _run_experiment_maxent(base_args, option_args, save_dir, run_id):
+    os.makedirs(save_dir, exist_ok=True)
+    save_path_transitions = os.path.join(save_dir, f"part{run_id}_run.pkl")
+    save_path_options = os.path.join(save_dir, f"part{run_id}_options.pkl")
+    if os.path.exists(save_path_options) and os.path.exists(save_path_transitions):
+        return
+    try:
+        transitions, options = collect_run_maxent(base_args, option_args, node_num=run_id)
+        dump_pickle(transitions, save_path_transitions)
+        dump_pickle(options, save_path_options)
+    except Exception as e:
+        print("EXCEPTION:", e)
+        import traceback
+        traceback.print_exc()    
+
+def _run_experiment_random(base_args, save_dir, run_id):
+    os.makedirs(save_dir, exist_ok=True)
+    save_path_transitions = os.path.join(save_dir, f"part{run_id}_run.pkl")
+    if os.path.exists(save_path_transitions):
+        return
+    try:
+        transitions, _ = collect_run_random(base_args)
+        dump_pickle(transitions, save_path_transitions)
+    except Exception as e:
+        print("EXCEPTION:", e)
+        import traceback
+        traceback.print_exc()    
+
+def _compute_l1_from_experiment(base_args, adv_args, save_dir, run_id):
+    transition_file = os.path.join(save_dir, f"part{run_id}_run.pkl")
+    run = read_pickle(transition_file)
+    l1_covs, adv_policy = compute_l1_from_run(base_args, adv_args, run)
+
+    dump_file = os.path.join(save_dir, f"part{run_id}_l1.pkl")
+    dump_pickle(l1_covs, dump_file)
+
+
+def _compute_stats_from_experiment(base_args, adv_args, save_dir, run_id):
+    transition_file = os.path.join(save_dir, f"part{run_id}_run.pkl")
+    run = read_pickle(transition_file)
+    stats = compute_stats_from_run(base_args, adv_args, run)
+
+    dump_file = os.path.join(save_dir, f"part{run_id}_stats.pkl")
+    dump_pickle(stats, dump_file)
+
+
+def collect_sample(base_args, option_args, save_dir, run_id):
+    exps = [
+        ("eigenoptions", _run_experiment_eigenoptions),
+        ("sa_eigenoptions", _run_experiment_sa_eigenoptions),
+        ("codex", _run_experiment_codex),
+        ("maxent", _run_experiment_maxent),
+        ("random", _run_experiment_random)
+    ]
+
+
+    with ProcessPoolExecutor(max_workers=5) as executor:
+        futures = [
+            executor.submit(
+                exp,
+                base_args,
+                option_args, 
+                os.path.join(save_dir, file),
+                run_id
+            ) 
+            for file, exp in exps
+        ]
+
+        for i,f in enumerate(as_completed(futures)):
+            pass
+    
+
+def compute(base_args, adv_args, save_dir, run_id):
+    exps = [
+        ("eigenoptions", _run_experiment_eigenoptions),
+        ("sa_eigenoptions", _run_experiment_sa_eigenoptions),
+        ("codex", _run_experiment_codex),
+        ("maxent", _run_experiment_maxent),
+        ("random", _run_experiment_random)
+    ]
+    with ProcessPoolExecutor(max_workers=10) as executor:
+        futures = [
+            executor.submit(
+                _compute_l1_from_experiment,
+                base_args,
+                adv_args, 
+                os.path.join(save_dir, file),
+                run_id
+            ) 
+            for exp, file in exps
+        ] + [
+            executor.submit(
+                _compute_stats_from_experiment,
+                base_args,
+                adv_args, 
+                os.path.join(save_dir, file),
+                run_id
+            ) 
+            for file, exp in exps
+        ]
+
+        for i,f in enumerate(as_completed(futures)):
+            pass
+
+
+
+def parse_args():
+    parser = argparse.ArgumentParser(description="Job runner configuration")
+
+    parser.add_argument(
+        "--epochs",
+        type=int,
+        default=20,
+        help="Number of epochs to run (default: 1)"
+    )
+    parser.add_argument(
+        "--save_dir",
+        type=str,
+        default="out",
+        help="Save path"
+    )
+
+    parser.add_argument(
+        "--exp_name",
+        type=str,
+        default="MountainCar",
+        help="MountainCar | Pendulum | CartPole"
+    )
+    parser.add_argument(
+        "--run_id",
+        type=int,
+        help="run id"
+    )
+
+    return parser.parse_args()
+
+
+
+
+
+import experiments
+if __name__ == "__main__":
+    
+    kwargs = parse_args()
+    
+    if kwargs.exp_name == "MountainCar":
+        base_args, option_args, adv_args = experiments.mountaincar_qlearning_easy(epochs=kwargs.epochs, l1_online=10000)
+    if kwargs.exp_name == "Pendulum":
+        base_args, option_args, adv_args = experiments.pendulum_default_qlearning(epochs=kwargs.epochs, l1_online=20000)
+    if kwargs.exp_name == "CartPole":
+        base_args, option_args, adv_args = experiments.cartpole_default(epochs=kwargs.epochs, l1_online=40000)
+
+
+    save_dir = kwargs.save_dir
+    run_id = kwargs.run_id
+
+
+    os.makedirs(save_dir, exist_ok=True)
+
+    if run_id == 0:
+        dump_pickle({
+            "base_args":base_args,
+            "option_args": option_args,
+            "adv_args": adv_args
+            }, os.path.join(save_dir, "params.pkl"))
+
+    collect_sample(base_args, option_args, save_dir, run_id)
+    compute()

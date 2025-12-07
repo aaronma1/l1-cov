@@ -1,4 +1,4 @@
-def mountaincar_qlearning_easy(epochs=15, l1_online=5000, verbose=False):
+def mountaincar_qlearning_easy(epochs=15, l1_online=10000, l1_online_es =10000, verbose=False):
     base_args = {
         "l1_eps": 1e-4,  # regularizer epsilon for
         "env_name": "MountainCarContinuous-v0",
@@ -32,7 +32,7 @@ def mountaincar_qlearning_easy(epochs=15, l1_online=5000, verbose=False):
         "gamma": 0.99,
         "lr": 0.01,
         "online_epochs": l1_online,
-        "offline_epochs": 10000,
+        "offline_epochs": l1_online_es,
         "learning_args": {
             "epsilon_start": 0.3,
             "epsilon_decay": 0.999,
@@ -47,60 +47,12 @@ def mountaincar_qlearning_easy(epochs=15, l1_online=5000, verbose=False):
     }
     return base_args, option_args, adv_args
 
-def mountaincar_qlearning_hard(epochs=15, l1_online=5000, verbose=False):
-    base_args = {
-        "l1_eps": 1e-4,  # regularizer epsilon for
-        "env_name": "MountainCarContinuous-v0",
-        "s_bins":[18, 16],
-        "a_bins":[7],
-        "env_T": 200,
-        "num_rollouts": 400,
-        "num_epochs": epochs,
-    }
-    option_args = {
-        "policy": "Qlearning",
-        "gamma":0.99,
-        "lr":0.01,
-        "online_epochs":1000,
-        "offline_epochs":5,
-        "learning_args": {
-            "epsilon_start": 0.1,
-            "epsilon_decay": 0.999,
-            "decay_every": 1,
-            "verbose": verbose,
-            "print_every": 100,
-        },
-        "rollout_args": {
-            "epsilon": 0.1,
-        }
-    }
-    # more comprehensive qlearning args for l1 coverage
-    adv_args = {
-        "policy": "Qlearning",
-        "gamma": 0.99,
-        "lr": 0.01,
-        "online_epochs": l1_online,
-        "offline_epochs": 0,
-        "learning_args": {
-            "epsilon_start": 0.3,
-            "epsilon_decay": 0.999,
-            "decay_every": 1,
-            "verbose": verbose,
-            "print_every": 100,
-        },
-        "rollout_args": {
-            "epsilon": 0.0,
-        },
-        "print_every": 100,
-    }
-
-    return base_args, option_args, adv_args
 
 #################################################################
 # PENDULUM
 #################################################################
     
-def pendulum_default_qlearning(epochs=15, l1_online=5000, verbose=False):
+def pendulum_default_qlearning(epochs=15, l1_online=10000, l1_online_es=10000, verbose=False):
     base_args = {
         "l1_eps": 1e-4,  # regularizer epsilon for
         "s_bins": [10, 10, 12], 
@@ -134,7 +86,7 @@ def pendulum_default_qlearning(epochs=15, l1_online=5000, verbose=False):
         "gamma": 0.99,
         "lr": 0.01,
         "online_epochs": l1_online,
-        "offline_epochs": 10000,
+        "offline_epochs": l1_online_es,
         "learning_args": {
             "epsilon_start": 0.0,
             "epsilon_decay": 0.999,
@@ -150,7 +102,7 @@ def pendulum_default_qlearning(epochs=15, l1_online=5000, verbose=False):
 
     return base_args, option_args, adv_args
 
-def pendulum_default(epochs=15, l1_online=5000, verbose=False):
+def pendulum_default(epochs=15, l1_online=5000, l1_online_es=10000, verbose=False):
     base_args = {
         "l1_eps": 1e-4,  # regularizer epsilon for
         "s_bins": [8,8,8], 
@@ -182,7 +134,7 @@ def pendulum_default(epochs=15, l1_online=5000, verbose=False):
         "gamma": 0.99,
         "lr": 0.01,
         "online_epochs": l1_online,
-        "offline_epochs": 0,
+        "offline_epochs": l1_online_es,
         "learning_args": {
             "update_every": 5,
             "verbose": verbose,
@@ -195,7 +147,7 @@ def pendulum_default(epochs=15, l1_online=5000, verbose=False):
 
     return base_args, option_args, adv_args
     
-def cartpole_default(epochs=15, l1_online=5000, verbose=False):
+def cartpole_default(epochs=15, l1_online=40000, l1_online_es=40000, verbose=False):
     base_args = {
         "l1_eps": 1e-4,  # regularizer epsilon for
         "s_bins": [8,8,10,8], 
@@ -229,7 +181,7 @@ def cartpole_default(epochs=15, l1_online=5000, verbose=False):
         "gamma": 0.99,
         "lr": 0.01,
         "online_epochs": l1_online,
-        "offline_epochs": 0,
+        "offline_epochs": l1_online_es,
         "learning_args": {
             "epsilon_start": 0.01,
             "epsilon_decay": 0.999,

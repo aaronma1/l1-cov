@@ -5,7 +5,7 @@ import argparse
 import os
 import tempfile
 import pickle
-
+import numpy as np
 
 
 from concurrent.futures import ProcessPoolExecutor, as_completed
@@ -157,6 +157,7 @@ def _compute_stats_from_experiment(base_args, adv_args, save_dir, run_id):
     transition_file = os.path.join(save_dir, f"part{run_id}_run.pkl")
     run = read_pickle(transition_file)
     stats = compute_stats_from_run(base_args, adv_args, run)
+    print(stats)
 
     dump_file = os.path.join(save_dir, f"part{run_id}_stats.pkl")
     dump_pickle(stats, dump_file)
@@ -171,16 +172,15 @@ def collect(save_dir, prefix):
         if f.endswith("_l1.pkl")
     )
 
-
     stats_pkls = sorted(
         os.path.join(exp_dir, f)
         for f in os.listdir(exp_dir)
-        if f.endswith("_l1.pkl")
+        if f.endswith("_stats.pkl")
     )
 
     l1_pkl = os.path.join(save_dir, f"{prefix}_l1_covs.pkl")
     all_l1_covs = []
-    for fname in l1_pkls():
+    for fname in l1_pkls:
         l1 = read_pickle(fname)
         all_l1_covs.append(l1)
     all_l1_covs = np.array(all_l1_covs)
@@ -188,17 +188,21 @@ def collect(save_dir, prefix):
         
 
     stats_pkl = os.path.join(save_dir, f"{prefix}_stats.pkl")
-    run_stats = None
-    for fname in stats_pkls():
+    stats = None
+    for fname in stats_pkls:
         run_stats =  read_pickle(fname)
+        print(run_stats)
         if stats == None:
-            stats = {}
+            stats = dict()
             for key in run_stats.keys():
                 stats[key] = [run_stats[key]]
         else:
             for key in run_stats.keys():
                 stats[key].append(run_stats[key])
-        dump_pickle(run_stats, stats_pkl)
+
+    for key in run_stats.keys():
+        stats[key] = np.array(stats[key])
+    dump_pickle(run_stats, stats_pkl)
 
 
 def compute(base_args, adv_args, save_dir, run_id):
@@ -284,11 +288,11 @@ if __name__ == "__main__":
     kwargs = parse_args()
     
     if kwargs.exp_name == "MountainCar":
-        base_args, option_args, adv_args = experiments.mountaincar_qlearning_easy(epochs=kwargs.epochs, l1_online=10000)
+        base_args, option_args, adv_args = experiments.mountaincar_qlearning_easy(epochs=kwargs.epochs, l1_online=10, l1_online_es=10)
     if kwargs.exp_name == "Pendulum":
-        base_args, option_args, adv_args = experiments.pendulum_default_qlearning(epochs=kwargs.epochs, l1_online=20000)
+        base_args, option_args, adv_args = experiments.pendulum_default_qlearning(epochs=kwargs.epochs, l1_online=20000, l1_online_es= 20000)
     if kwargs.exp_name == "CartPole":
-        base_args, option_args, adv_args = experiments.cartpole_default(epochs=kwargs.epochs, l1_online=40000)
+        base_args, option_args, adv_args = experiments.cartpole_default(epochs=kwargs.epochs, l1_online=40000, l1_online_es=20000)
 
 
     save_dir = kwargs.save_dir
@@ -304,5 +308,6 @@ if __name__ == "__main__":
             "adv_args": adv_args
             }, os.path.join(save_dir, "params.pkl"))
 
+    multiprocessing.set_start_method("spawn", force=True) 
     collect_sample(base_args, option_args, save_dir, run_id)
     compute(base_args, adv_args, save_dir, run_id)

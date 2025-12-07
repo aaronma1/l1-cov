@@ -139,7 +139,7 @@ def wait_gpu(SR):
             eigenvalues, eigenvectors = torch.linalg.eigh(SR_torch)
             eigenvalues = eigenvalues.cpu().numpy()
             eigenvectors = eigenvectors.cpu().numpy()
-            return eigenvalues
+            return eigenvectors, eigenvalues
         except RuntimeError as E:
             pass
 

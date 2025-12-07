@@ -178,7 +178,7 @@ def compute(base_args, adv_args, save_dir, run_id):
                 os.path.join(save_dir, file),
                 run_id
             ) 
-            for exp, file in exps
+            for file, exp  in exps
         ] + [
             executor.submit(
                 _compute_stats_from_experiment,
@@ -256,4 +256,4 @@ if __name__ == "__main__":
             }, os.path.join(save_dir, "params.pkl"))
 
     collect_sample(base_args, option_args, save_dir, run_id)
-    compute()
+    compute(base_args, adv_args, save_dir, run_id)

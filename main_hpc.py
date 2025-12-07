@@ -117,6 +117,33 @@ def _run_experiment_random(base_args, save_dir, run_id):
         import traceback
         traceback.print_exc()    
 
+
+
+def collect_sample(base_args, option_args, save_dir, run_id):
+    exps = [
+        ("random", _run_experiment_random),
+        ("eigenoptions", _run_experiment_eigenoptions),
+        ("codex", _run_experiment_codex),
+        ("maxent", _run_experiment_maxent),
+        ("sa_eigenoptions", _run_experiment_sa_eigenoptions),
+    ]
+
+
+    with ProcessPoolExecutor(max_workers=4) as executor:
+        futures = [
+            executor.submit(
+                exp,
+                base_args,
+                option_args, 
+                os.path.join(save_dir, file),
+                run_id
+            ) 
+            for file, exp in exps
+        ]
+
+        for i,f in enumerate(as_completed(futures)):
+            pass
+    
 def _compute_l1_from_experiment(base_args, adv_args, save_dir, run_id):
     transition_file = os.path.join(save_dir, f"part{run_id}_run.pkl")
     run = read_pickle(transition_file)
@@ -134,32 +161,45 @@ def _compute_stats_from_experiment(base_args, adv_args, save_dir, run_id):
     dump_file = os.path.join(save_dir, f"part{run_id}_stats.pkl")
     dump_pickle(stats, dump_file)
 
+def collect(save_dir, prefix):
 
-def collect_sample(base_args, option_args, save_dir, run_id):
-    exps = [
-        ("eigenoptions", _run_experiment_eigenoptions),
-        ("sa_eigenoptions", _run_experiment_sa_eigenoptions),
-        ("codex", _run_experiment_codex),
-        ("maxent", _run_experiment_maxent),
-        ("random", _run_experiment_random)
-    ]
+    exp_dir = os.path.join(save_dir, prefix)
+
+    l1_pkls =  sorted(
+        os.path.join(exp_dir, f)
+        for f in os.listdir(exp_dir)
+        if f.endswith("_l1.pkl")
+    )
 
 
-    with ProcessPoolExecutor(max_workers=5) as executor:
-        futures = [
-            executor.submit(
-                exp,
-                base_args,
-                option_args, 
-                os.path.join(save_dir, file),
-                run_id
-            ) 
-            for file, exp in exps
-        ]
+    stats_pkls = sorted(
+        os.path.join(exp_dir, f)
+        for f in os.listdir(exp_dir)
+        if f.endswith("_l1.pkl")
+    )
 
-        for i,f in enumerate(as_completed(futures)):
-            pass
-    
+    l1_pkl = os.path.join(save_dir, f"{prefix}_l1_covs.pkl")
+    all_l1_covs = []
+    for fname in l1_pkls():
+        l1 = read_pickle(fname)
+        all_l1_covs.append(l1)
+    all_l1_covs = np.array(all_l1_covs)
+    dump_pickle(all_l1_covs, l1_pkl)
+        
+
+    stats_pkl = os.path.join(save_dir, f"{prefix}_stats.pkl")
+    run_stats = None
+    for fname in stats_pkls():
+        run_stats =  read_pickle(fname)
+        if stats == None:
+            stats = {}
+            for key in run_stats.keys():
+                stats[key] = [run_stats[key]]
+        else:
+            for key in run_stats.keys():
+                stats[key].append(run_stats[key])
+        dump_pickle(run_stats, stats_pkl)
+
 
 def compute(base_args, adv_args, save_dir, run_id):
     exps = [
@@ -169,7 +209,7 @@ def compute(base_args, adv_args, save_dir, run_id):
         ("maxent", _run_experiment_maxent),
         ("random", _run_experiment_random)
     ]
-    with ProcessPoolExecutor(max_workers=10) as executor:
+    with ProcessPoolExecutor(max_workers=5) as executor:
         futures = [
             executor.submit(
                 _compute_l1_from_experiment,
@@ -192,6 +232,17 @@ def compute(base_args, adv_args, save_dir, run_id):
 
         for i,f in enumerate(as_completed(futures)):
             pass
+    
+        
+    if run_id == 0:
+        for file, _ in exps:
+            collect(save_dir, file)
+
+
+
+
+
+    
 
 
 
@@ -224,8 +275,6 @@ def parse_args():
     )
 
     return parser.parse_args()
-
-
 
 
 

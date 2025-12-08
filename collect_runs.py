@@ -305,7 +305,6 @@ def compute_l1_from_run(base_args, adv_args, run):
     l1_covs = []
     adv_policies = []
     for i, epoch in enumerate(run):
-        print(f"computing epoch {i}")
         epoch_rollouts = epoch["all_rollouts"]
         p_sa = p_sa_from_rollouts(epoch_rollouts, sa_agg)
         uniform_density_sa = np.ones(sa_agg.shape())

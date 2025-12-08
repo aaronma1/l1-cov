@@ -104,12 +104,12 @@ def _run_experiment_maxent(base_args, option_args, save_dir, run_id):
         import traceback
         traceback.print_exc()    
 
-def _run_experiment_random(base_args, save_dir, run_id):
-    os.makedirs(save_dir, exist_ok=True)
-    save_path_transitions = os.path.join(save_dir, f"part{run_id}_run.pkl")
-    if os.path.exists(save_path_transitions):
-        return
+def _run_experiment_random(base_args, opt_args, save_dir, run_id):
     try:
+        os.makedirs(save_dir, exist_ok=True)
+        save_path_transitions = os.path.join(save_dir, f"part{run_id}_run.pkl")
+        if os.path.exists(save_path_transitions):
+            return
         transitions, _ = collect_run_random(base_args)
         dump_pickle(transitions, save_path_transitions)
     except Exception as e:
@@ -153,12 +153,16 @@ def _compute_l1_from_experiment(base_args, adv_args, save_dir, run_id):
     dump_pickle(l1_covs, dump_file)
 
 
-def _compute_stats_from_experiment(base_args, adv_args, save_dir, run_id):
+def _compute_stats_from_experiment(base_args, save_dir, run_id):
     transition_file = os.path.join(save_dir, f"part{run_id}_run.pkl")
     run = read_pickle(transition_file)
-    stats = compute_stats_from_run(base_args, adv_args, run)
-    print(stats)
+    try:
+        stats = compute_stats_from_run(base_args, run)
 
+    except Exception as e:
+        print("EXCEPTION:", e)
+        import traceback
+        traceback.print_exc()    
     dump_file = os.path.join(save_dir, f"part{run_id}_stats.pkl")
     dump_pickle(stats, dump_file)
 
@@ -183,7 +187,8 @@ def collect(save_dir, prefix):
     for fname in l1_pkls:
         l1 = read_pickle(fname)
         all_l1_covs.append(l1)
-    all_l1_covs = np.array(all_l1_covs)
+    # each key should map to an array
+    all_l1_covs = np.atleast_2d(np.array(all_l1_covs))
     dump_pickle(all_l1_covs, l1_pkl)
         
 
@@ -191,7 +196,6 @@ def collect(save_dir, prefix):
     stats = None
     for fname in stats_pkls:
         run_stats =  read_pickle(fname)
-        print(run_stats)
         if stats == None:
             stats = dict()
             for key in run_stats.keys():
@@ -199,9 +203,9 @@ def collect(save_dir, prefix):
         else:
             for key in run_stats.keys():
                 stats[key].append(run_stats[key])
-
-    for key in run_stats.keys():
-        stats[key] = np.array(stats[key])
+    # each key should map to an array
+    for key in stats.keys():
+        stats[key] = np.atleast_2d(np.array(stats[key]))
     dump_pickle(run_stats, stats_pkl)
 
 
@@ -227,7 +231,6 @@ def compute(base_args, adv_args, save_dir, run_id):
             executor.submit(
                 _compute_stats_from_experiment,
                 base_args,
-                adv_args, 
                 os.path.join(save_dir, file),
                 run_id
             ) 
@@ -238,9 +241,8 @@ def compute(base_args, adv_args, save_dir, run_id):
             pass
     
         
-    if run_id == 0:
-        for file, _ in exps:
-            collect(save_dir, file)
+    for file, _ in exps:
+        collect(save_dir, file)
 
 
 

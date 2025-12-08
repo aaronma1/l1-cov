@@ -154,7 +154,7 @@ def cartpole_default(epochs=15, l1_online=40000, l1_online_es=40000, verbose=Fal
         "a_bins": None,
         "env_name": "CartPole-v1",
         "env_T": 200,
-        "num_rollouts": 300,
+        "num_rollouts": 500,
         "num_epochs": epochs,
     }
         
@@ -163,7 +163,7 @@ def cartpole_default(epochs=15, l1_online=40000, l1_online_es=40000, verbose=Fal
         "gamma":0.99,
         "lr":0.01,
         "online_epochs":2000,
-        "offline_epochs":15,
+        "offline_epochs":5,
         "learning_args": {
             "epsilon_start": 0.1,
             "epsilon_decay": 0.999,

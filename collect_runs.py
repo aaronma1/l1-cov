@@ -180,7 +180,7 @@ def collect_run_eigenoptions(base_args, option_args, node_num=0):
         top_eig = s_agg.unflatten_s_table(eigenvectors[:, 0])
         if np.dot(top_eig.flatten(), p_s.flatten()) > 0:
             top_eig = -top_eig
-        reward = S_Reward(s_agg, top_eig)
+        reward = S_Reward(s_agg, top_eig, termination_rew=-200)
         # learn an option
         options.append(
             learn_policy(

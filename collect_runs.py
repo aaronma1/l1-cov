@@ -135,6 +135,13 @@ def learn_policy(env, base_args, option_args, reward_fn, transitions=None):
 def wait_gpu(SR):
 
     retries = 100
+    if not torch.cuda.is_available():
+        SR_torch = torch.as_tensor(SR, device="cpu", dtype=torch.float64)
+        eigenvalues, eigenvectors = torch.linalg.eigh(SR_torch)
+        eigenvalues = eigenvalues.cpu().numpy()
+        eigenvectors = eigenvectors.cpu().numpy()
+        return eigenvectors, eigenvalues
+
 
     for i in range(retries):
         try:

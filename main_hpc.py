@@ -45,7 +45,7 @@ def _run_experiment_eigenoptions(base_args, option_args, save_dir, run_id):
     try:
         transitions, options = collect_run_eigenoptions(base_args, option_args, node_num=run_id)
         dump_pickle(transitions, save_path_transitions)
-        dump_pickle(options, save_path_options)
+        # dump_pickle(options, save_path_options)
     except Exception as e:
         print("EXCEPTION:", e)
         import traceback
@@ -61,7 +61,7 @@ def _run_experiment_sa_eigenoptions(base_args, option_args, save_dir, run_id):
     try:
         transitions, options = collect_run_sa_eigenoptions(base_args, option_args, node_num=run_id)
         dump_pickle(transitions, save_path_transitions)
-        dump_pickle(options, save_path_options)
+        # dump_pickle(options, save_path_options)
     except Exception as e:
         print("EXCEPTION:", e)
         import traceback
@@ -69,7 +69,7 @@ def _run_experiment_sa_eigenoptions(base_args, option_args, save_dir, run_id):
 
 
     dump_pickle(transitions, save_path_transitions)
-    dump_pickle(options, save_path_options)
+    # dump_pickle(options, save_path_options)
 
 def _run_experiment_codex(base_args, option_args, save_dir, run_id):
     os.makedirs(save_dir, exist_ok=True)
@@ -86,7 +86,7 @@ def _run_experiment_codex(base_args, option_args, save_dir, run_id):
         import traceback
         traceback.print_exc()    
     dump_pickle(transitions, save_path_transitions)
-    dump_pickle(options, save_path_options)
+    # dump_pickle(options, save_path_options)
     
 
 def _run_experiment_maxent(base_args, option_args, save_dir, run_id):
@@ -206,7 +206,7 @@ def collect(save_dir, prefix):
     # each key should map to an array
     for key in stats.keys():
         stats[key] = np.atleast_2d(np.array(stats[key]))
-    dump_pickle(run_stats, stats_pkl)
+    dump_pickle(stats, stats_pkl)
 
 
 def compute(base_args, adv_args, save_dir, run_id):

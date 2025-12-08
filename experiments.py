@@ -13,7 +13,7 @@ def mountaincar_qlearning_easy(epochs=15, l1_online=10000, l1_online_es =10000, 
         "policy": "Qlearning",
         "gamma":0.99,
         "lr":0.01,
-        "online_epochs":200,
+        "online_epochs":1000,
         "offline_epochs":5,
         "learning_args": {
             "epsilon_start": 0.1,
